@@ -109,7 +109,7 @@ io.on("connection", (socket) => {
   socket.on("join-room", (roomId) => {
     const roomSize = io.sockets.adapter.rooms.get(roomId)?.size || 0;
     console.log("rooms of socket:", Array.from(socket.rooms));
-    if (roomSize >= 3) {
+    if (roomSize >= 10) {
       socket.emit("room-full", roomId);
       return;
     }
