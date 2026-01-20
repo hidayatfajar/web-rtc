@@ -18,9 +18,8 @@ module.exports = {
         NODE_ENV: 'production',
         PORT: 3001,
         HOST: '0.0.0.0',
-        // Ganti dengan domain VPS kamu
-        BASE_URL: 'https://api.yourdomain.com',
-        ALLOWED_ORIGINS: 'https://yourdomain.com,https://www.yourdomain.com',
+        BASE_URL: 'https://api.rekrutmen-traspac.web.id',
+        ALLOWED_ORIGINS: 'https://web-rtc-xi-five.vercel.app',
       },
     },
   ],
