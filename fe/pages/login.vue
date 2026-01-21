@@ -157,7 +157,7 @@
         </div>
         <!-- Ambient Glow for distinctiveness -->
         <div
-          class="absolute -inset-4 bg-gradient-to-tr from-blue-400/20 to-purple-400/20 rounded-[32px] blur-2xl -z-10 opacity-60 pointer-events-none"
+          class="absolute -inset-4 bg-linear-to-tr from-blue-400/20 to-purple-400/20 rounded-4xl blur-2xl -z-10 opacity-60 pointer-events-none"
         ></div>
       </main>
       <!-- Footer -->
