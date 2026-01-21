@@ -298,7 +298,7 @@
         <!-- Local Video (Your Camera) -->
         <div
           class="relative border-2 rounded-lg overflow-hidden bg-gray-800 transition-all"
-          :class="isSpeaking[socket?.id || ''] ? 'border-green-500 shadow-lg shadow-green-500/50' : 'border-blue-500'"
+          :class="isSpeaking[currentSocketId] ? 'border-green-500 shadow-lg shadow-green-500/50' : 'border-blue-500'"
           style="aspect-ratio: 16/9"
         >
           <video
@@ -320,7 +320,7 @@
           
           <!-- Speaking Indicator (Wave Animation) -->
           <div
-            v-if="isSpeaking[socket?.id || ''] && micEnabled"
+            v-if="isSpeaking[currentSocketId] && micEnabled"
             class="absolute top-2 right-2 flex gap-1 items-end h-6 z-10"
           >
             <div class="w-1 bg-green-400 rounded-full animate-wave-1" style="height: 30%"></div>
@@ -617,6 +617,9 @@ let localCameraStream: MediaStream | null = null;
 let localScreenStream: MediaStream | null = null;
 let mediaRecorder: MediaRecorder | null = null;
 let recordedChunks: Blob[] = [];
+
+// Computed property for safe socket ID access
+const currentSocketId = computed(() => socket?.id || '');
 
 // ICE server (STUN only for research)
 const rtcConfig: RTCConfiguration = {
