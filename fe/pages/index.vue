@@ -26,14 +26,33 @@
         📹 {{ cameraEnabled ? "Stop Camera" : "Start Camera" }}
       </button>
 
-      <button
-        v-if="joined"
-        class="border rounded px-3 py-2"
-        :class="micEnabled ? 'bg-blue-500 text-white' : 'bg-gray-300'"
-        @click="toggleMic"
-      >
-        🎤 {{ micEnabled ? "Mute" : "Unmute" }}
-      </button>
+      <div v-if="joined" class="relative">
+        <button
+          class="border rounded px-3 py-2"
+          :class="micEnabled ? 'bg-blue-500 text-white' : 'bg-gray-300'"
+          @click="toggleMic"
+        >
+          🎤 {{ micEnabled ? "Mute" : "Unmute" }}
+        </button>
+        
+        <!-- Mic Warning Tooltip -->
+        <div
+          v-if="showMicWarning"
+          class="absolute bottom-full left-0 mb-2 w-64 bg-yellow-100 border-2 border-yellow-400 rounded-lg shadow-lg p-3 z-50 animate-pulse"
+        >
+          <div class="flex items-start gap-2">
+            <span class="text-xl">⚠️</span>
+            <div class="flex-1">
+              <p class="text-sm font-semibold text-yellow-800 mb-1">Apakah Anda berbicara?</p>
+              <p class="text-xs text-yellow-700">Mikrofon Anda tidak aktif. Aktifkan untuk berkomunikasi dengan peserta lain.</p>
+            </div>
+            <button 
+              @click="showMicWarning = false"
+              class="text-yellow-600 hover:text-yellow-800 text-lg leading-none"
+            >&times;</button>
+          </div>
+        </div>
+      </div>
 
       <button
         v-if="joined"
@@ -278,7 +297,8 @@
       <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <!-- Local Video (Your Camera) -->
         <div
-          class="relative border-2 border-blue-500 rounded-lg overflow-hidden bg-gray-800"
+          class="relative border-2 rounded-lg overflow-hidden bg-gray-800 transition-all"
+          :class="isSpeaking[socket?.id || ''] ? 'border-green-500 shadow-lg shadow-green-500/50' : 'border-blue-500'"
           style="aspect-ratio: 16/9"
         >
           <video
@@ -297,6 +317,19 @@
             <div class="text-7xl mb-2">👤</div>
             <div class="text-sm text-gray-400">Camera Off</div>
           </div>
+          
+          <!-- Speaking Indicator (Wave Animation) -->
+          <div
+            v-if="isSpeaking[socket?.id || ''] && micEnabled"
+            class="absolute top-2 right-2 flex gap-1 items-end h-6 z-10"
+          >
+            <div class="w-1 bg-green-400 rounded-full animate-wave-1" style="height: 30%"></div>
+            <div class="w-1 bg-green-400 rounded-full animate-wave-2" style="height: 50%"></div>
+            <div class="w-1 bg-green-400 rounded-full animate-wave-3" style="height: 80%"></div>
+            <div class="w-1 bg-green-400 rounded-full animate-wave-2" style="height: 50%"></div>
+            <div class="w-1 bg-green-400 rounded-full animate-wave-1" style="height: 30%"></div>
+          </div>
+          
           <div
             class="absolute bottom-2 left-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-sm z-10"
           >
@@ -310,7 +343,8 @@
             (p) => !p.includes('(You)'),
           )"
           :key="participant"
-          class="relative border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-800"
+          class="relative border-2 rounded-lg overflow-hidden bg-gray-800 transition-all"
+          :class="isSpeaking[participant.split(' ')[0]] ? 'border-green-500 shadow-lg shadow-green-500/50' : 'border-gray-300'"
           style="aspect-ratio: 16/9"
         >
           <video
@@ -328,6 +362,19 @@
             <div class="text-7xl mb-2">👤</div>
             <div class="text-sm text-gray-400">Camera Off</div>
           </div>
+          
+          <!-- Speaking Indicator (Wave Animation) -->
+          <div
+            v-if="isSpeaking[participant.split(' ')[0]] && participantMediaStatus[participant.split(' ')[0]]?.mic"
+            class="absolute top-2 right-2 flex gap-1 items-end h-6 z-10"
+          >
+            <div class="w-1 bg-green-400 rounded-full animate-wave-1" style="height: 30%"></div>
+            <div class="w-1 bg-green-400 rounded-full animate-wave-2" style="height: 50%"></div>
+            <div class="w-1 bg-green-400 rounded-full animate-wave-3" style="height: 80%"></div>
+            <div class="w-1 bg-green-400 rounded-full animate-wave-2" style="height: 50%"></div>
+            <div class="w-1 bg-green-400 rounded-full animate-wave-1" style="height: 30%"></div>
+          </div>
+          
           <div
             class="absolute bottom-2 left-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-sm z-10"
           >
@@ -540,6 +587,13 @@ const screenShareStreams = ref<Record<string, MediaStream>>({});
 const hasRemoteScreenShare = ref(false);
 const whoIsSharing = ref<string | null>(null);
 
+// Audio detection states
+const isSpeaking = ref<Record<string, boolean>>({});
+const showMicWarning = ref(false);
+const localAudioLevel = ref(0);
+let localAudioAnalyser: AnalyserNode | null = null;
+let audioDetectionInterval: ReturnType<typeof setInterval> | null = null;
+
 const debugLog = ref<string[]>([]);
 
 const log = (msg: string) => {
@@ -586,6 +640,20 @@ const rtcConfig: RTCConfiguration = {
   ],
 };
 
+// Watch isSpeaking changes for debugging
+watch(
+  isSpeaking,
+  (newValue) => {
+    const speakingUsers = Object.entries(newValue)
+      .filter(([_, speaking]) => speaking)
+      .map(([peerId, _]) => peerId.substring(0, 8));
+    
+    if (speakingUsers.length > 0) {
+      log(`[WATCH] Currently speaking: ${speakingUsers.join(', ')}`);
+    }
+  },
+  { deep: true }
+);
 
 // Watch for participant stream changes and update video elements
 watch(
@@ -709,6 +777,10 @@ function ensurePC(peerId: string) {
         participantStreams.value[peerId] = stream;
       }
       
+      // Setup audio detection for remote stream
+      log(`[TRACK] Calling setupRemoteAudioDetection for ${peerId}...`);
+      setupRemoteAudioDetection(peerId, stream);
+      
       // Force video element to play after short delay
       setTimeout(() => {
         const videoEl = document.getElementById(`video-${peerId}`) as HTMLVideoElement;
@@ -748,11 +820,47 @@ async function joinRoom() {
       stopSharing();
     }
 
+    // Stop camera if enabled
+    if (cameraEnabled.value) {
+      if (localCameraStream) {
+        const videoTracks = localCameraStream.getVideoTracks();
+        videoTracks.forEach((track) => track.stop());
+      }
+      cameraEnabled.value = false;
+      if (localVideo.value) localVideo.value.srcObject = null;
+      log("Camera stopped on disconnect");
+    }
+
+    // Stop mic if enabled
+    if (micEnabled.value) {
+      if (localCameraStream) {
+        const audioTracks = localCameraStream.getAudioTracks();
+        audioTracks.forEach((track) => track.stop());
+      }
+      micEnabled.value = false;
+      log("Mic stopped on disconnect");
+    }
+
+    // Clear local camera stream completely
+    localCameraStream = null;
+
+    // Close all peer connections
+    Object.values(peerConnections).forEach((pc) => pc.close());
+    peerConnections = {};
+
+    // Clear all streams and states
+    participantStreams.value = {};
+    screenShareStreams.value = {};
+    participantMediaStatus.value = {};
+    whoIsSharing.value = null;
+    hasRemoteScreenShare.value = false;
+
     socket.disconnect();
     socket = null;
     joined.value = false;
     participants.value = [];
-    log("Disconnected from room");
+
+    log("Disconnected from room and reset all states");
     return;
   }
 
@@ -773,6 +881,7 @@ async function joinRoom() {
       // Host is the first person in the room
       isHost.value = par.length === 1 && par[0] === socketId;
       log(`Joined room: ${rid} as ${socketId} ${isHost.value ? "(HOST)" : ""}`);
+      log(`[AUDIO DETECTION] Initial state - cameraEnabled: ${cameraEnabled.value}, micEnabled: ${micEnabled.value}`);
       handleParticipantListUpdate(par);
 
       // Handle initial screen share state
@@ -917,6 +1026,13 @@ async function joinRoom() {
       participantMediaStatus.value[socketId] = { camera: false, mic: false };
     }
     participantMediaStatus.value[socketId].mic = enabled;
+  });
+
+  // Speaking status events
+  socket.on("speaking-status", ({ socketId, speaking }: any) => {
+    log(`[SOCKET] Received speaking-status from ${socketId.substring(0, 8)}: ${speaking}`);
+    isSpeaking.value[socketId] = speaking;
+    log(`[SOCKET] Updated isSpeaking state for ${socketId.substring(0, 8)}: ${isSpeaking.value[socketId]}`);
   });
 
   socket.on("media-status-requested", ({ requesterId }: any) => {
@@ -1081,7 +1197,14 @@ async function toggleCamera() {
 async function toggleMic() {
   if (micEnabled.value) {
     // Disable mic
+    log("[MIC] Disabling microphone...");
     micEnabled.value = false;
+    
+    // Clear speaking state for local user
+    if (socket?.id) {
+      isSpeaking.value[socket.id] = false;
+      log("[MIC] Cleared local speaking state");
+    }
 
     // Remove audio tracks from all peer connections
     for (const [peerId, pc] of Object.entries(peerConnections)) {
@@ -1151,6 +1274,10 @@ async function toggleMic() {
           await createAndSendOffer(peerId);
         }
       }
+
+      // Start audio detection for local mic
+      log("[MIC] Calling startLocalAudioDetection()...");
+      startLocalAudioDetection();
 
       log("Microphone enabled");
     } catch (err: any) {
@@ -2135,9 +2262,137 @@ function discardRecording() {
   log("Recording discarded");
 }
 
+// ============= AUDIO DETECTION FUNCTIONS =============
+
+function setupAudioDetection(stream: MediaStream, peerId: string) {
+  try {
+    log(`[AUDIO DETECTION] Starting setup for ${peerId === socket?.id ? 'local (You)' : peerId}`);
+    log(`[AUDIO DETECTION] Stream tracks: ${stream.getTracks().map(t => t.kind).join(', ')}`);
+    
+    const audioTracks = stream.getAudioTracks();
+    log(`[AUDIO DETECTION] Audio tracks count: ${audioTracks.length}`);
+    
+    if (audioTracks.length === 0) {
+      log(`[AUDIO DETECTION] ❌ No audio tracks found for ${peerId}`);
+      return;
+    }
+
+    const audioTrack = audioTracks[0];
+    log(`[AUDIO DETECTION] Audio track state: enabled=${audioTrack.enabled}, muted=${audioTrack.muted}, readyState=${audioTrack.readyState}`);
+    
+    const audioContext = new AudioContext();
+    log(`[AUDIO DETECTION] AudioContext created, state: ${audioContext.state}`);
+    
+    const analyser = audioContext.createAnalyser();
+    analyser.fftSize = 512;
+    analyser.smoothingTimeConstant = 0.8;
+    log(`[AUDIO DETECTION] Analyser configured: fftSize=${analyser.fftSize}, frequencyBinCount=${analyser.frequencyBinCount}`);
+
+    const source = audioContext.createMediaStreamSource(stream);
+    source.connect(analyser);
+    log(`[AUDIO DETECTION] Source connected to analyser`);
+
+    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+    const threshold = 30; // Audio threshold (adjust as needed)
+    
+    let frameCount = 0;
+    let lastLogTime = Date.now();
+
+    const detectAudio = () => {
+      analyser.getByteFrequencyData(dataArray);
+      const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+      
+      frameCount++;
+      
+      // Log every 60 frames (about 1 second) or when speaking state changes
+      const now = Date.now();
+      const shouldLog = (now - lastLogTime) > 1000;
+      
+      if (shouldLog) {
+        log(`[AUDIO DETECTION] ${peerId === socket?.id ? 'YOU' : peerId.substring(0, 8)}: level=${average.toFixed(2)}, threshold=${threshold}, mic=${micEnabled.value ? 'ON' : 'OFF'}`);
+        lastLogTime = now;
+      }
+      
+      const speaking = average > threshold;
+      
+      // Update speaking state
+      if (isSpeaking.value[peerId] !== speaking) {
+        log(`[AUDIO DETECTION] 🔊 ${peerId === socket?.id ? 'YOU' : peerId.substring(0, 8)} ${speaking ? 'STARTED' : 'STOPPED'} speaking (level: ${average.toFixed(2)})`);
+        isSpeaking.value[peerId] = speaking;
+        
+        // Broadcast speaking state to others
+        if (peerId === socket?.id) {
+          log(`[AUDIO DETECTION] Broadcasting speaking status: ${speaking}`);
+          socket?.emit("speaking-status", {
+            roomId: roomId.value,
+            speaking,
+          });
+          
+          // Show warning if speaking but mic is off
+          if (speaking && !micEnabled.value) {
+            log(`[AUDIO DETECTION] ⚠️ Speaking detected but mic is OFF - showing warning`);
+            showMicWarning.value = true;
+            // Auto hide after 5 seconds
+            setTimeout(() => {
+              showMicWarning.value = false;
+            }, 5000);
+          }
+        }
+      }
+      
+      requestAnimationFrame(detectAudio);
+    };
+
+    detectAudio();
+    
+    log(`[AUDIO DETECTION] ✅ Setup complete and running for ${peerId === socket?.id ? 'local' : peerId}`);
+  } catch (err: any) {
+    log(`[AUDIO DETECTION] ❌ Error for ${peerId}: ${err.message}`);
+    console.error('[AUDIO DETECTION] Full error:', err);
+  }
+}
+
+function startLocalAudioDetection() {
+  log(`[AUDIO DETECTION] startLocalAudioDetection() called`);
+  log(`[AUDIO DETECTION] localCameraStream exists: ${!!localCameraStream}`);
+  log(`[AUDIO DETECTION] socket.id: ${socket?.id}`);
+  
+  if (!localCameraStream) {
+    log(`[AUDIO DETECTION] ❌ No localCameraStream`);
+    return;
+  }
+  
+  const audioTracks = localCameraStream.getAudioTracks();
+  log(`[AUDIO DETECTION] Local audio tracks: ${audioTracks.length}`);
+  
+  if (audioTracks.length > 0 && socket?.id) {
+    log(`[AUDIO DETECTION] Creating audio stream for local detection...`);
+    const audioStream = new MediaStream([audioTracks[0]]);
+    setupAudioDetection(audioStream, socket.id);
+  } else {
+    log(`[AUDIO DETECTION] ❌ Cannot start: audioTracks=${audioTracks.length}, socketId=${socket?.id}`);
+  }
+}
+
+function setupRemoteAudioDetection(peerId: string, stream: MediaStream) {
+  log(`[AUDIO DETECTION] setupRemoteAudioDetection() called for ${peerId}`);
+  const audioTracks = stream.getAudioTracks();
+  log(`[AUDIO DETECTION] Remote ${peerId} audio tracks: ${audioTracks.length}`);
+  
+  if (audioTracks.length > 0) {
+    log(`[AUDIO DETECTION] Setting up detection for remote peer ${peerId}...`);
+    setupAudioDetection(stream, peerId);
+  } else {
+    log(`[AUDIO DETECTION] ⚠️ No audio tracks for remote peer ${peerId}`);
+  }
+}
+
 onBeforeUnmount(() => {
   if (recordingTimer) {
     clearInterval(recordingTimer);
+  }
+  if (audioDetectionInterval) {
+    clearInterval(audioDetectionInterval);
   }
   if (recording.value) {
     stopRecording();
