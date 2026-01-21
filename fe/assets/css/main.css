@@ -1,6 +1,56 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
 
+@theme static {
+  /* Primary Nuxt UI (500 = #1766cc) */
+  --ui-color-primary-50: #f1f7ff;
+  --ui-color-primary-100: #e1eeff;
+  --ui-color-primary-200: #bedcff;
+  --ui-color-primary-300: #86bbff;
+  --ui-color-primary-400: #4a93ff;
+  --ui-color-primary-500: #1766cc; /* Warna utama */
+  --ui-color-primary-600: #1257b8;
+  --ui-color-primary-700: #0e4598;
+  --ui-color-primary-800: #0b3576;
+  --ui-color-primary-900: #082754;
+  --ui-color-primary-950: #041735;
+
+  --color-orange-50: #fff9ed;
+  --color-orange-100: #fff3d4;
+  --color-orange-200: #ffe2a8;
+  --color-orange-300: #ffcd70;
+  --color-orange-400: #ffab37;
+  --color-orange-500: #ff961b;
+  --color-orange-600: #f07406;
+  --color-orange-700: #c75807;
+  --color-orange-800: #9e450e;
+  --color-orange-900: #7f3b0f;
+  --color-orange-950: #451b05;
+  --color-tersier: #181e50;
+  --color-secondary1: #dff6fe;
+  --color-secondary2: #09335d;
+  --color-container: #f5f5f5;
+  --color-benar: #00d930;
+  --color-aeff00: #aeff00;
+  --color-tidakdijawab: #ff9800;
+  --color-uraian: #c44afe;
+  --color-ff961b: #ff9800;
+  --color-salah: #ff5656;
+  --color-ffffff: #ffffff;
+  --color-fafafa: #fafafa;
+  --color-f5f5f5: #f5f5f5;
+  --color-e2e2e2: #e2e2e2;
+  --color-c6c6c6: #c6c6c6;
+  --color-ababab: #ababab;
+  --color-dadada: #dadada;
+  --color-919191: #919191;
+  --color-777777: #777777;
+  --color-5e5e5e: #5e5e5e;
+  --color-474747: #474747;
+  --color-303030: #303030;
+  --color-1b1b1b: #1b1b1b;
+}
+
 .border-line {
   border-radius: 8px;
   border: 1px solid #ccc;
@@ -9,7 +59,8 @@
 
 /* Wave animations for speaking indicator */
 @keyframes wave {
-  0%, 100% {
+  0%,
+  100% {
     height: 30%;
   }
   50% {
