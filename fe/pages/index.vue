@@ -26,7 +26,7 @@
         📹 {{ cameraEnabled ? "Stop Camera" : "Start Camera" }}
       </button>
 
-      <div v-if="joined" class="relative">
+      <div v-if="joined" class="relative inline-block">
         <button
           class="border rounded px-3 py-2"
           :class="micEnabled ? 'bg-blue-500 text-white' : 'bg-gray-300'"
@@ -38,7 +38,7 @@
         <!-- Mic Warning Tooltip -->
         <div
           v-if="showMicWarning"
-          class="absolute bottom-full left-0 mb-2 w-64 bg-yellow-100 border-2 border-yellow-400 rounded-lg shadow-lg p-3 z-50 animate-pulse"
+          class="absolute top-full left-0 mt-2 w-72 bg-yellow-100 border-2 border-yellow-400 rounded-lg shadow-xl p-3 z-50 animate-pulse"
         >
           <div class="flex items-start gap-2">
             <span class="text-xl">⚠️</span>
@@ -298,7 +298,7 @@
         <!-- Local Video (Your Camera) -->
         <div
           class="relative border-2 rounded-lg overflow-hidden bg-gray-800 transition-all"
-          :class="isSpeaking[currentSocketId] ? 'border-green-500 shadow-lg shadow-green-500/50' : 'border-blue-500'"
+          :class="(isSpeaking[currentSocketId] && micEnabled) ? 'border-green-500 shadow-lg shadow-green-500/50' : 'border-blue-500'"
           style="aspect-ratio: 16/9"
         >
           <video
@@ -344,7 +344,7 @@
           )"
           :key="participant"
           class="relative border-2 rounded-lg overflow-hidden bg-gray-800 transition-all"
-          :class="isSpeaking[participant.split(' ')[0]] ? 'border-green-500 shadow-lg shadow-green-500/50' : 'border-gray-300'"
+          :class="(isSpeaking[participant.split(' ')[0]] && participantMediaStatus[participant.split(' ')[0]]?.mic) ? 'border-green-500 shadow-lg shadow-green-500/50' : 'border-gray-300'"
           style="aspect-ratio: 16/9"
         >
           <video
@@ -593,6 +593,8 @@ const showMicWarning = ref(false);
 const localAudioLevel = ref(0);
 let localAudioAnalyser: AnalyserNode | null = null;
 let audioDetectionInterval: ReturnType<typeof setInterval> | null = null;
+let lastWarningTime = 0; // Timestamp of last warning shown
+const WARNING_COOLDOWN = 30000; // 30 seconds cooldown
 
 const debugLog = ref<string[]>([]);
 
@@ -617,6 +619,7 @@ let localCameraStream: MediaStream | null = null;
 let localScreenStream: MediaStream | null = null;
 let mediaRecorder: MediaRecorder | null = null;
 let recordedChunks: Blob[] = [];
+let hiddenAudioStream: MediaStream | null = null; // For audio detection when mic is OFF
 
 // Computed property for safe socket ID access
 const currentSocketId = computed(() => socket?.id || '');
@@ -846,6 +849,13 @@ async function joinRoom() {
 
     // Clear local camera stream completely
     localCameraStream = null;
+    
+    // Stop hidden audio stream if exists
+    if (hiddenAudioStream) {
+      log("Stopping hidden audio stream on disconnect");
+      hiddenAudioStream.getTracks().forEach((track) => track.stop());
+      hiddenAudioStream = null;
+    }
 
     // Close all peer connections
     Object.values(peerConnections).forEach((pc) => pc.close());
@@ -908,6 +918,12 @@ async function joinRoom() {
       if (par.length > 1) {
         socket?.emit("request-media-status", { roomId: rid });
       }
+      
+      // Start audio detection immediately (even if mic is OFF)
+      log(`[AUDIO DETECTION] Auto-starting detection on join room...`);
+      setTimeout(() => {
+        startLocalAudioDetection();
+      }, 1000); // Small delay to ensure socket.id is set
     },
   );
 
@@ -1241,9 +1257,20 @@ async function toggleMic() {
     }
 
     log("Microphone disabled");
+    
+    // Start hidden audio detection for warning tooltip
+    log("[MIC] Starting hidden audio detection for warning tooltip...");
+    startLocalAudioDetection();
   } else {
     // Enable mic
     try {
+      // Stop hidden audio stream if exists
+      if (hiddenAudioStream) {
+        log("[MIC] Stopping hidden audio stream...");
+        hiddenAudioStream.getTracks().forEach(track => track.stop());
+        hiddenAudioStream = null;
+      }
+      
       const newStream = await navigator.mediaDevices.getUserMedia({
         video: false,
         audio: true,
@@ -2331,14 +2358,37 @@ function setupAudioDetection(stream: MediaStream, peerId: string) {
             speaking,
           });
           
-          // Show warning if speaking but mic is off
+          // Show warning if speaking but mic is off (with cooldown)
+          log(`[TOOLTIP] Check conditions - speaking: ${speaking}, micEnabled: ${micEnabled.value}`);
+          const now = Date.now();
+          const timeSinceLastWarning = now - lastWarningTime;
+          
           if (speaking && !micEnabled.value) {
-            log(`[AUDIO DETECTION] ⚠️ Speaking detected but mic is OFF - showing warning`);
-            showMicWarning.value = true;
-            // Auto hide after 5 seconds
-            setTimeout(() => {
-              showMicWarning.value = false;
-            }, 5000);
+            if (timeSinceLastWarning >= WARNING_COOLDOWN) {
+              log(`[TOOLTIP] ⚠️ TRIGGERING WARNING - Speaking detected but mic is OFF`);
+              log(`[TOOLTIP] Cooldown passed (${(timeSinceLastWarning / 1000).toFixed(1)}s since last warning)`);
+              log(`[TOOLTIP] Setting showMicWarning from ${showMicWarning.value} to true`);
+              showMicWarning.value = true;
+              lastWarningTime = now;
+              log(`[TOOLTIP] showMicWarning now: ${showMicWarning.value}`);
+              
+              // Auto hide after 5 seconds
+              setTimeout(() => {
+                log(`[TOOLTIP] Auto-hiding warning after 5 seconds`);
+                showMicWarning.value = false;
+                log(`[TOOLTIP] showMicWarning now: ${showMicWarning.value}`);
+              }, 5000);
+            } else {
+              const remainingCooldown = Math.ceil((WARNING_COOLDOWN - timeSinceLastWarning) / 1000);
+              log(`[TOOLTIP] ⏳ Cooldown active - ${remainingCooldown}s remaining`);
+            }
+          } else {
+            if (!speaking) {
+              log(`[TOOLTIP] Not showing - user stopped speaking`);
+            }
+            if (micEnabled.value) {
+              log(`[TOOLTIP] Not showing - mic is already ON`);
+            }
           }
         }
       }
@@ -2358,22 +2408,48 @@ function setupAudioDetection(stream: MediaStream, peerId: string) {
 function startLocalAudioDetection() {
   log(`[AUDIO DETECTION] startLocalAudioDetection() called`);
   log(`[AUDIO DETECTION] localCameraStream exists: ${!!localCameraStream}`);
+  log(`[AUDIO DETECTION] hiddenAudioStream exists: ${!!hiddenAudioStream}`);
   log(`[AUDIO DETECTION] socket.id: ${socket?.id}`);
+  log(`[AUDIO DETECTION] micEnabled: ${micEnabled.value}`);
   
-  if (!localCameraStream) {
-    log(`[AUDIO DETECTION] ❌ No localCameraStream`);
+  // If we already have audio detection running, don't start again
+  if (hiddenAudioStream && socket?.id) {
+    log(`[AUDIO DETECTION] Audio detection already running`);
     return;
   }
   
-  const audioTracks = localCameraStream.getAudioTracks();
-  log(`[AUDIO DETECTION] Local audio tracks: ${audioTracks.length}`);
-  
-  if (audioTracks.length > 0 && socket?.id) {
-    log(`[AUDIO DETECTION] Creating audio stream for local detection...`);
-    const audioStream = new MediaStream([audioTracks[0]]);
-    setupAudioDetection(audioStream, socket.id);
+  // If mic is ON, use localCameraStream
+  if (micEnabled.value && localCameraStream) {
+    const audioTracks = localCameraStream.getAudioTracks();
+    log(`[AUDIO DETECTION] Local audio tracks from camera stream: ${audioTracks.length}`);
+    
+    if (audioTracks.length > 0 && socket?.id) {
+      log(`[AUDIO DETECTION] Creating audio stream for local detection (mic ON)...`);
+      const audioStream = new MediaStream([audioTracks[0]]);
+      setupAudioDetection(audioStream, socket.id);
+    } else {
+      log(`[AUDIO DETECTION] ❌ Cannot start: audioTracks=${audioTracks.length}, socketId=${socket?.id}`);
+    }
+  } 
+  // If mic is OFF but joined, create hidden stream for detection only
+  else if (joined.value && socket?.id) {
+    log(`[AUDIO DETECTION] Mic is OFF, creating hidden audio stream for detection...`);
+    
+    navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+      .then((stream) => {
+        hiddenAudioStream = stream;
+        log(`[AUDIO DETECTION] ✅ Hidden audio stream created for detection`);
+        
+        if (socket?.id) {
+          setupAudioDetection(stream, socket.id);
+          log(`[AUDIO DETECTION] Audio detection active (mic OFF, hidden stream)`);
+        }
+      })
+      .catch((err) => {
+        log(`[AUDIO DETECTION] ❌ Failed to create hidden audio stream: ${err.message}`);
+      });
   } else {
-    log(`[AUDIO DETECTION] ❌ Cannot start: audioTracks=${audioTracks.length}, socketId=${socket?.id}`);
+    log(`[AUDIO DETECTION] ❌ Cannot start - joined: ${joined.value}, socketId: ${socket?.id}`);
   }
 }
 
