@@ -1,17 +1,17 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
-  devtools: { enabled: process.env.NODE_ENV !== 'production' },
-  modules: ["nuxt-socket-io", "@nuxt/ui"],
+  devtools: { enabled: process.env.NODE_ENV !== "production" },
+  modules: ["nuxt-socket-io", "@nuxt/ui", "@pinia/nuxt"],
   css: ["~/assets/css/main.css"],
-  
+
   // Runtime config untuk environment variables
   runtimeConfig: {
     public: {
-      socketUrl: process.env.NUXT_PUBLIC_SOCKET_URL || 'http://localhost:3001'
-    }
+      socketUrl: process.env.NUXT_PUBLIC_SOCKET_URL || "http://localhost:3001",
+    },
   },
-  
+
   colorMode: {
     dataValue: "theme",
     preference: "light", // default value for users without a system preference
@@ -19,7 +19,7 @@ export default defineNuxtConfig({
     // force to use light mode
     classSuffix: "",
   },
-  
+
   io: {
     sockets: [
       {
