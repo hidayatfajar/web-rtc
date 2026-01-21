@@ -206,6 +206,11 @@ io.on("connection", (socket) => {
     console.log(`socket ${socket.id} mic ${enabled ? "enabled" : "disabled"}`);
   });
 
+  // Speaking status (audio detection)
+  socket.on("speaking-status", ({ roomId, speaking }) => {
+    socket.to(roomId).emit("speaking-status", { socketId: socket.id, speaking });
+  });
+
   // Request media status from all participants
   socket.on("request-media-status", ({ roomId }) => {
     socket.to(roomId).emit("media-status-requested", { requesterId: socket.id });
@@ -235,6 +240,12 @@ io.on("connection", (socket) => {
     }
     socket.to(roomId).emit("recording-stopped", { socketId: socket.id });
     console.log(`socket ${socket.id} stopped recording in room ${roomId}`);
+  });
+
+  socket.on("kick-participant", ({ roomId, targetId }) => {
+    io.to(targetId).emit("kicked", { roomId });
+    io.sockets.sockets.get(targetId)?.leave(roomId);
+    console.log(`socket ${targetId} was kicked from room ${roomId} by ${socket.id}`);
   });
 
   socket.on("disconnect", () => {
