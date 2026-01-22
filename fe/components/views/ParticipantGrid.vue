@@ -14,13 +14,15 @@
           participant.isSpeaking,
       }"
     >
-      <!-- Video Background -->
-      <div
-        class="absolute inset-0 bg-cover bg-center"
-        :style="{
-          backgroundImage: `url('${participant.avatar}')`,
-        }"
-      ></div>
+      <!-- Video Background - Always render for stream binding -->
+      <video
+        :id="`video-${participant.id}`"
+        autoplay
+        playsinline
+        :muted="participant.isYou"
+        v-show="!participant.isVideoOff"
+        class="absolute inset-0 w-full h-full object-cover"
+      ></video>
 
       <!-- Gradient Scrim -->
       <div
@@ -105,7 +107,7 @@
           class="w-1 bg-primary rounded-full h-1/2 animate-[pulse_0.6s_ease-in-out_infinite]"
         ></div>
       </div>      </transition>
-      <!-- Video Off Overlay -->
+      <!-- Video Off Overlay - Show only when video is off -->
       <transition
         enter-active-class="transition-all duration-300"
         leave-active-class="transition-all duration-300"
@@ -116,29 +118,131 @@
       >
         <div
           v-if="participant.isVideoOff"
-          class="absolute inset-0 bg-slate-900 flex items-center justify-center"
+          class="absolute inset-0 bg-slate-900 flex items-center justify-center z-10"
         >
-        <div class="text-center">
-          <div
-            class="w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center mb-3 mx-auto"
-          >
-            <UIcon name="material-symbols:person" class="text-[32px] text-slate-400" />
+          <div class="text-center">
+            <div
+              class="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-blue-700 flex items-center justify-center mb-3 mx-auto shadow-lg"
+            >
+              <span class="text-3xl font-bold text-white">{{ participant.name.substring(0, 2).toUpperCase() }}</span>
+            </div>
+            <p class="text-white text-base font-medium">{{ participant.name }}</p>
           </div>
-          <p class="text-white text-sm font-medium">{{ participant.name }}</p>
         </div>
-      </div>
       </transition>
     </div>
   </transition-group>
 </template>
 
 <script setup lang="ts">
+import { watch, nextTick } from 'vue'
 import type { Participant } from '~/stores/meeting'
 
 const props = defineProps<{
   participants: Participant[]
   gridClass: string
+  localStream?: MediaStream | null
+  remoteStreams?: Map<string, MediaStream>
 }>()
+
+// Watch for local stream changes
+watch(
+  () => props.localStream,
+  (newStream) => {
+    console.log('[ParticipantGrid] Local stream watch triggered, stream:', !!newStream)
+    nextTick(() => {
+      const you = props.participants.find(p => p.isYou)
+      console.log('[ParticipantGrid] Found YOU participant:', you?.name, 'ID:', you?.id)
+      if (you && newStream) {
+        const videoEl = document.getElementById(`video-${you.id}`) as HTMLVideoElement
+        console.log('[ParticipantGrid] Video element exists:', !!videoEl, 'ID:', `video-${you.id}`)
+        if (videoEl) {
+          videoEl.srcObject = newStream
+          videoEl.play().catch((e) => console.error(`[Video] Error playing local:`, e))
+          console.log('[ParticipantGrid] ✅ Set local stream for:', you.name)
+        }
+      }
+    })
+  },
+  { immediate: true }
+)
+
+// Watch for remote streams changes
+watch(
+  () => props.remoteStreams,
+  (newStreams) => {
+    console.log('[ParticipantGrid] Remote streams watch triggered')
+    console.log('[ParticipantGrid] Remote streams size:', newStreams?.size || 0)
+    console.log('[ParticipantGrid] Remote streams keys:', newStreams ? Array.from(newStreams.keys()) : [])
+    console.log('[ParticipantGrid] Participants:', props.participants.map(p => ({ id: p.id, name: p.name, isYou: p.isYou })))
+    
+    nextTick(() => {
+      if (!newStreams) {
+        console.log('[ParticipantGrid] No remote streams')
+        return
+      }
+      
+      for (const [socketId, stream] of newStreams.entries()) {
+        console.log('[ParticipantGrid] Processing stream for socketId:', socketId)
+        console.log('[ParticipantGrid] Stream has', stream.getTracks().length, 'tracks:', stream.getTracks().map(t => t.kind))
+        
+        const videoEl = document.getElementById(`video-${socketId}`) as HTMLVideoElement
+        console.log('[ParticipantGrid] Video element exists:', !!videoEl, 'ID:', `video-${socketId}`)
+        
+        if (videoEl) {
+          videoEl.srcObject = stream
+          videoEl.play().catch((e) => console.error(`[Video] Error playing remote ${socketId}:`, e))
+          console.log('[ParticipantGrid] ✅ Set remote stream for:', socketId)
+          
+          // Force play after delay like in index-backup.vue
+          setTimeout(() => {
+            if (videoEl.srcObject) {
+              console.log('[ParticipantGrid] Force playing video after 100ms for:', socketId)
+              videoEl.play().catch(() => {})
+            }
+          }, 100)
+        } else {
+          console.error('[ParticipantGrid] ❌ Video element NOT FOUND for:', socketId)
+        }
+      }
+    })
+  },
+  { deep: true, immediate: true }
+)
+
+// Watch for participants changes to update videos
+watch(
+  () => props.participants,
+  () => {
+    console.log('[ParticipantGrid] Participants changed, re-binding streams')
+    nextTick(() => {
+      // Re-trigger stream updates when participants change
+      props.participants.forEach(participant => {
+        const videoEl = document.getElementById(`video-${participant.id}`) as HTMLVideoElement
+        if (!videoEl) {
+          console.log('[ParticipantGrid] No video element for:', participant.name, participant.id)
+          return
+        }
+        
+        if (participant.isYou && props.localStream) {
+          videoEl.srcObject = props.localStream
+          videoEl.play().catch(() => {})
+          console.log('[ParticipantGrid] Re-bound local stream for:', participant.name)
+        } else if (props.remoteStreams) {
+          const remoteStream = props.remoteStreams.get(participant.id)
+          if (remoteStream) {
+            videoEl.srcObject = remoteStream
+            videoEl.play().catch(() => {})
+            console.log('[ParticipantGrid] Re-bound remote stream for:', participant.name, participant.id)
+          } else {
+            console.log('[ParticipantGrid] No remote stream found for:', participant.name, participant.id)
+          }
+        }
+      })
+    })
+  },
+  { deep: true }
+)
 </script>
 
 <style scoped>

@@ -12,8 +12,19 @@
         'ring-2 ring-primary': participant.isSpeaking,
       }"
     >
-      <!-- Video Background -->
+      <!-- Video Element for real video -->
+      <video
+        :id="`thumb-${participant.id}`"
+        autoplay
+        playsinline
+        :muted="participant.isYou"
+        v-show="!participant.isVideoOff"
+        class="absolute inset-0 w-full h-full object-cover"
+      ></video>
+      
+      <!-- Video Background (fallback) -->
       <div
+        v-if="participant.isVideoOff"
         class="absolute inset-0 bg-cover bg-center"
         :style="{
           backgroundImage: `url('${participant.avatar}')`,
@@ -120,11 +131,82 @@
 </template>
 
 <script setup lang="ts">
+import { watch, nextTick } from 'vue'
 import type { Participant } from '~/stores/meeting'
 
 const props = defineProps<{
   participants: Participant[]
+  localStream?: MediaStream | null
+  remoteStreams?: Map<string, MediaStream>
 }>()
+
+// Watch for local stream changes
+watch(
+  () => props.localStream,
+  (newStream) => {
+    nextTick(() => {
+      const you = props.participants.find(p => p.isYou)
+      if (you && newStream) {
+        const videoEl = document.getElementById(`thumb-${you.id}`) as HTMLVideoElement
+        if (videoEl) {
+          videoEl.srcObject = newStream
+          videoEl.play().catch(() => {})
+        }
+      }
+    })
+  },
+  { immediate: true }
+)
+
+// Watch for remote streams changes
+watch(
+  () => props.remoteStreams,
+  (newStreams) => {
+    nextTick(() => {
+      if (!newStreams) return
+      
+      for (const [socketId, stream] of newStreams.entries()) {
+        const videoEl = document.getElementById(`thumb-${socketId}`) as HTMLVideoElement
+        if (videoEl) {
+          videoEl.srcObject = stream
+          videoEl.play().catch(() => {})
+          
+          setTimeout(() => {
+            if (videoEl.srcObject) {
+              videoEl.play().catch(() => {})
+            }
+          }, 100)
+        }
+      }
+    })
+  },
+  { deep: true, immediate: true }
+)
+
+// Watch for participants changes
+watch(
+  () => props.participants,
+  () => {
+    nextTick(() => {
+      props.participants.forEach(participant => {
+        const videoEl = document.getElementById(`thumb-${participant.id}`) as HTMLVideoElement
+        if (!videoEl) return
+        
+        if (participant.isYou && props.localStream) {
+          videoEl.srcObject = props.localStream
+          videoEl.play().catch(() => {})
+        } else if (props.remoteStreams) {
+          const remoteStream = props.remoteStreams.get(participant.id)
+          if (remoteStream) {
+            videoEl.srcObject = remoteStream
+            videoEl.play().catch(() => {})
+          }
+        }
+      })
+    })
+  },
+  { deep: true }
+)
 </script>
 
 <style scoped>
