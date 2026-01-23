@@ -183,6 +183,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
+const store = useMeetingStore()
 const username = ref('')
 const roomId = ref('123-456-789')
 const isJoining = ref(false)
@@ -196,10 +197,12 @@ const handleJoin = async () => {
     // Navigate to meeting room with state
     await router.push({
       path: `/${roomId.value}`,
-      query: {
-        username: username.value.trim()
-      }
+      // query: {
+      //   username: username.value.trim()
+      // }
     })
+    store.username = username.value.trim()
+    localStorage.setItem('username', username.value.trim())
   } catch (error) {
     console.error('Failed to join:', error)
     isJoining.value = false
