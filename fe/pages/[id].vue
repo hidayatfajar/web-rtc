@@ -326,37 +326,41 @@
                     </transition>
                   </button>
                 </div>
-
-                <!-- Tab Content -->
-                <div class="flex-1 overflow-hidden relative">
-                  <transition
-                    mode="out-in"
-                    enter-active-class="transition-all duration-200 ease-out"
-                    leave-active-class="transition-all duration-200 ease-in"
-                    enter-from-class="opacity-0 translate-x-4"
-                    enter-to-class="opacity-100 translate-x-0"
-                    leave-from-class="opacity-100 translate-x-0"
-                    leave-to-class="opacity-0 -translate-x-4"
-                  >
-                    <ParticipantList
-                      v-if="store.tabActive === 'participants'"
-                      :participants="store.participants"
-                      :is-host="isHost"
-                      :is-co-host="isCoHost"
-                      :on-kick="handleKickParticipant"
-                      :on-assign-co-host="handleAssignCoHost"
-                      :on-remove-co-host="handleRemoveCoHost"
-                      :on-rename="handleRenameUser"
-                    />
-                    <ChatPanel
-                      v-else
-                      :messages="store.messages"
-                      :participants="store.participants"
-                      :current-user-id="currentUserId"
-                      @send-message="handleSendMessage"
-                    />
-                  </transition>
-                </div>
+                <transition
+                  mode="out-in"
+                  enter-active-class="transition-all duration-200 ease-out"
+                  leave-active-class="transition-all duration-200 ease-in"
+                  enter-from-class="opacity-0 translate-x-4"
+                  enter-to-class="opacity-100 translate-x-0"
+                  leave-from-class="opacity-100 translate-x-0"
+                  leave-to-class="opacity-0 -translate-x-4"
+                >
+                  <!-- Tab Content -->
+                  <div class="flex-1 overflow-hidden relative">
+                    <div
+                      v-show="store.tabActive === 'participants'"
+                      class="h-full"
+                    >
+                      <ParticipantList
+                        :participants="store.participants"
+                        :is-host="isHost"
+                        :is-co-host="isCoHost"
+                        :on-kick="handleKickParticipant"
+                        :on-assign-co-host="handleAssignCoHost"
+                        :on-remove-co-host="handleRemoveCoHost"
+                        :on-rename="handleRenameUser"
+                      />
+                    </div>
+                    <div v-show="store.tabActive === 'chat'" class="h-full">
+                      <ChatPanel
+                        :messages="store.messages"
+                        :participants="store.participants"
+                        :current-user-id="currentUserId"
+                        @send-message="handleSendMessage"
+                      />
+                    </div>
+                  </div>
+                </transition>
               </template>
             </aside>
           </transition>
@@ -438,7 +442,20 @@ const toast = useAppToast();
 
 // Get room ID from route
 const roomId = computed(() => route.params.id as string);
-const username = computed(() => route.query.username as string);
+const username = computed(() => {
+  // Try to get from store first
+  if (store.username) return store.username;
+
+  // Fallback to query param
+  const nameFromQuery = route.query.username as string;
+  if (nameFromQuery) return nameFromQuery;
+
+  // Fallback to localStorage
+  const nameFromStorage = localStorage.getItem("username");
+  if (nameFromStorage) return nameFromStorage;
+
+  return "";
+});
 
 // Initialize WebRTC
 const webrtc = ref<ReturnType<typeof useWebRTC> | null>(null);
