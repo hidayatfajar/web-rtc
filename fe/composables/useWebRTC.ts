@@ -878,6 +878,9 @@ export const useWebRTC = (roomId: string, username: string, onToast?: (type: 'su
       socket.disconnect()
       socket = null
     }
+
+    // Reset store
+    // store.resetMeeting()  
     
     console.log('[WebRTC] Left meeting')
   }
