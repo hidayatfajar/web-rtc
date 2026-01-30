@@ -17,6 +17,7 @@
       <!-- Video Background - Always render for stream binding -->
       <video
         :id="`video-${participant.id}`"
+        :data-participant="participant.isYou ? 'local' : participant.id"
         autoplay
         playsinline
         :muted="participant.isYou"
@@ -122,9 +123,11 @@
         >
           <div class="text-center">
             <div
-              class="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-blue-700 flex items-center justify-center mb-3 mx-auto shadow-lg"
+              class="w-20 h-20 rounded-full bg-linear-to-br from-primary to-blue-700 flex items-center justify-center mb-3 mx-auto shadow-lg"
             >
-              <span class="text-3xl font-bold text-white">{{ participant.name.substring(0, 2).toUpperCase() }}</span>
+              <span class="text-3xl font-bold text-white">{{ 
+                (participant.name || 'UN').slice(0, 2).toUpperCase()
+              }}</span>
             </div>
             <p class="text-white text-base font-medium">{{ participant.name }}</p>
           </div>
@@ -135,7 +138,7 @@
 </template>
 
 <script setup lang="ts">
-import { watch, nextTick } from 'vue'
+import { watch, nextTick, computed } from 'vue'
 import type { Participant } from '~/stores/meeting'
 
 const props = defineProps<{
@@ -145,12 +148,16 @@ const props = defineProps<{
   remoteStreams?: Map<string, MediaStream>
 }>()
 
+// Use a computed to track Map size for better reactivity
+const remoteStreamsSize = computed(() => props.remoteStreams?.size ?? 0)
+
 // Watch for local stream changes
 watch(
   () => props.localStream,
   (newStream) => {
     console.log('[ParticipantGrid] Local stream watch triggered, stream:', !!newStream)
     nextTick(() => {
+      console.log('[ParticipantGrid] Data Participants:', props.participants.map(p => ({ id: p.id, name: p.name, isYou: p.isYou })))
       const you = props.participants.find(p => p.isYou)
       console.log('[ParticipantGrid] Found YOU participant:', you?.name, 'ID:', you?.id)
       if (you && newStream) {
@@ -167,79 +174,125 @@ watch(
   { immediate: true }
 )
 
-// Watch for remote streams changes
+// Watch for remote streams changes AND participants changes together
+// This ensures video elements exist before we try to bind streams
 watch(
-  () => props.remoteStreams,
-  (newStreams) => {
-    console.log('[ParticipantGrid] Remote streams watch triggered')
+  [() => props.remoteStreams, remoteStreamsSize, () => props.participants],
+  ([newStreams, size, participants]) => {
+    console.log('[ParticipantGrid] 🔔 Remote streams watch triggered')
+    console.log('[ParticipantGrid] Timestamp:', new Date().toISOString())
     console.log('[ParticipantGrid] Remote streams size:', newStreams?.size || 0)
-    console.log('[ParticipantGrid] Remote streams keys:', newStreams ? Array.from(newStreams.keys()) : [])
-    console.log('[ParticipantGrid] Participants:', props.participants.map(p => ({ id: p.id, name: p.name, isYou: p.isYou })))
+    console.log('[ParticipantGrid] Remote streams keys:', newStreams ? Array.from(newStreams.keys()).map(k => k.substring(0, 8)) : [])
+    console.log('[ParticipantGrid] Participants count:', participants?.length || 0)
+    console.log('[ParticipantGrid] Participants:', participants?.map(p => ({ 
+      id: p.id.substring(0, 8), 
+      name: p.name, 
+      isYou: p.isYou,
+      isVideoOff: p.isVideoOff 
+    })) || [])
     
+    // CRITICAL: Wait for DOM to render participants first
     nextTick(() => {
-      if (!newStreams) {
-        console.log('[ParticipantGrid] No remote streams')
-        return
-      }
-      
-      for (const [socketId, stream] of newStreams.entries()) {
-        console.log('[ParticipantGrid] Processing stream for socketId:', socketId)
-        console.log('[ParticipantGrid] Stream has', stream.getTracks().length, 'tracks:', stream.getTracks().map(t => t.kind))
+      console.log('[ParticipantGrid] 🔄 After first nextTick, waiting 50ms for DOM...')
+      // Wait additional tick to ensure video elements are mounted
+      setTimeout(() => {
+        console.log('[ParticipantGrid] ⏰ 50ms delay complete, starting stream binding...')
         
-        const videoEl = document.getElementById(`video-${socketId}`) as HTMLVideoElement
-        console.log('[ParticipantGrid] Video element exists:', !!videoEl, 'ID:', `video-${socketId}`)
-        
-        if (videoEl) {
-          videoEl.srcObject = stream
-          videoEl.play().catch((e) => console.error(`[Video] Error playing remote ${socketId}:`, e))
-          console.log('[ParticipantGrid] ✅ Set remote stream for:', socketId)
-          
-          // Force play after delay like in index-backup.vue
-          setTimeout(() => {
-            if (videoEl.srcObject) {
-              console.log('[ParticipantGrid] Force playing video after 100ms for:', socketId)
-              videoEl.play().catch(() => {})
-            }
-          }, 100)
-        } else {
-          console.error('[ParticipantGrid] ❌ Video element NOT FOUND for:', socketId)
+        if (!newStreams || newStreams.size === 0) {
+          console.log('[ParticipantGrid] ❌ No remote streams to bind')
+          return
         }
-      }
+        
+        // Log all available video elements
+        const allVideoElements = Array.from(document.querySelectorAll('video'))
+        console.log('[ParticipantGrid] 📺 Available video elements:', 
+          allVideoElements.map(v => ({ id: v.id, hasStream: !!v.srcObject })))
+        
+        console.log('[ParticipantGrid] 🔄 Starting to bind', newStreams.size, 'remote streams...')
+        
+        for (const [socketId, stream] of newStreams.entries()) {
+          console.log('[ParticipantGrid] ====== Processing stream ======')
+          console.log('[ParticipantGrid] Socket ID:', socketId.substring(0, 8))
+          console.log('[ParticipantGrid] Stream ID:', stream.id.substring(0, 8))
+          console.log('[ParticipantGrid] Stream has', stream.getTracks().length, 'tracks:', stream.getTracks().map(t => `${t.kind}:${t.id.substring(0, 8)}`))
+          
+          const videoEl = document.getElementById(`video-${socketId}`) as HTMLVideoElement
+          console.log('[ParticipantGrid] Looking for video element ID:', `video-${socketId}`)
+          console.log('[ParticipantGrid] Video element found:', !!videoEl)
+          
+          if (videoEl) {
+            // 🔍 Check visibility
+            const isVisible = videoEl.offsetParent !== null
+            const display = window.getComputedStyle(videoEl).display
+            console.log('[ParticipantGrid] 👁️ Video element visible:', isVisible, 'display:', display)
+            
+            console.log('[ParticipantGrid] ✅ Setting srcObject for:', socketId.substring(0, 8))
+            videoEl.srcObject = stream
+            videoEl.play().catch((e) => {
+              console.error(`[Video] ❌ Error playing remote ${socketId.substring(0, 8)}:`, e)
+            }).then(() => {
+              console.log('[ParticipantGrid] ✅ Video playing for:', socketId.substring(0, 8))
+            })
+            
+            // Force play after delay
+            setTimeout(() => {
+              if (videoEl.srcObject) {
+                console.log('[ParticipantGrid] 🔁 Force playing video after 100ms for:', socketId.substring(0, 8))
+                videoEl.play().catch(() => {})
+              }
+            }, 100)
+          } else {
+            console.error('[ParticipantGrid] ❌ Video element NOT FOUND for:', socketId.substring(0, 8))
+            console.error('[ParticipantGrid] Expected ID:', `video-${socketId}`)
+            console.error('[ParticipantGrid] Available IDs:', allVideoElements.map(v => v.id))
+          }
+        }
+        
+        console.log('[ParticipantGrid] 🏁 Finished binding all remote streams')
+      }, 50) // 50ms delay to ensure DOM is ready
     })
   },
-  { deep: true, immediate: true }
+  { immediate: true, deep: true }
 )
 
-// Watch for participants changes to update videos
+// Watch for participants changes to update videos (BACKUP mechanism)
+// This will retry binding if the first attempt failed
 watch(
   () => props.participants,
   () => {
-    console.log('[ParticipantGrid] Participants changed, re-binding streams')
-    nextTick(() => {
-      // Re-trigger stream updates when participants change
+    console.log('[ParticipantGrid] 🔄 Participants changed, re-binding streams (BACKUP)')
+    
+    // Use longer delay to ensure everything is rendered
+    setTimeout(() => {
       props.participants.forEach(participant => {
         const videoEl = document.getElementById(`video-${participant.id}`) as HTMLVideoElement
         if (!videoEl) {
-          console.log('[ParticipantGrid] No video element for:', participant.name, participant.id)
+          console.log('[ParticipantGrid] No video element for:', participant.name, participant.id.substring(0, 8))
+          return
+        }
+        
+        // Check if video element already has stream
+        if (videoEl.srcObject) {
+          console.log('[ParticipantGrid] ✅ Video element already has stream:', participant.name)
           return
         }
         
         if (participant.isYou && props.localStream) {
+          console.log('[ParticipantGrid] 🔁 Re-binding local stream for:', participant.name)
           videoEl.srcObject = props.localStream
           videoEl.play().catch(() => {})
-          console.log('[ParticipantGrid] Re-bound local stream for:', participant.name)
         } else if (props.remoteStreams) {
           const remoteStream = props.remoteStreams.get(participant.id)
           if (remoteStream) {
+            console.log('[ParticipantGrid] 🔁 Re-binding remote stream for:', participant.name, participant.id.substring(0, 8))
             videoEl.srcObject = remoteStream
             videoEl.play().catch(() => {})
-            console.log('[ParticipantGrid] Re-bound remote stream for:', participant.name, participant.id)
           } else {
-            console.log('[ParticipantGrid] No remote stream found for:', participant.name, participant.id)
+            console.log('[ParticipantGrid] ⚠️ No remote stream found for:', participant.name, participant.id.substring(0, 8))
           }
         }
       })
-    })
+    }, 200) // Longer delay for backup mechanism
   },
   { deep: true }
 )
