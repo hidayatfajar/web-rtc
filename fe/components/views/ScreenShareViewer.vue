@@ -2,17 +2,17 @@
   <div
     class="w-full h-full rounded-2xl overflow-hidden bg-slate-900 shadow-lg ring-4 ring-primary ring-offset-2 ring-offset-surface-light dark:ring-offset-background-dark transition-all duration-300 flex items-center justify-center"
   >
-    <!-- Screen Share Video -->
+    <!-- Screen Share Video - Always render for ref binding -->
     <video
-      v-if="screenStream"
       ref="videoRef"
+      data-screen-share="true"
       autoplay
       playsinline
-      class="w-full h-full object-contain"
+      :class="screenStream ? 'w-full h-full object-contain' : 'hidden'"
     ></video>
     
     <!-- Placeholder when no stream -->
-    <div v-else class="text-center">
+    <div v-if="!screenStream" class="text-center">
       <UIcon
         name="material-symbols:present-to-all"
         class="text-[64px] text-slate-600 mb-4"
@@ -28,7 +28,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch, onMounted, nextTick } from 'vue'
 
 const props = defineProps<{
   screenStream?: MediaStream | null
@@ -37,32 +37,72 @@ const props = defineProps<{
 
 const videoRef = ref<HTMLVideoElement | null>(null)
 
-// Update video stream when it changes using watch
-watch(() => props.screenStream, (newStream) => {
-  console.log('[ScreenShareViewer] Watch triggered, newStream:', newStream)
+const setVideoStream = (stream: MediaStream | null) => {
+  console.log('[ScreenShareViewer] setVideoStream called, stream:', !!stream)
+  console.log('[ScreenShareViewer] videoRef.value exists:', !!videoRef.value)
+  
+  if (!videoRef.value) {
+    console.error('[ScreenShareViewer] ❌ videoRef is null!')
+    return
+  }
+  
+  if (!stream) {
+    console.log('[ScreenShareViewer] No stream, clearing srcObject')
+    videoRef.value.srcObject = null
+    return
+  }
+  
+  console.log('[ScreenShareViewer] Stream ID:', stream.id)
+  console.log('[ScreenShareViewer] Stream tracks:', stream.getTracks().map(t => ({
+    kind: t.kind,
+    id: t.id.substring(0, 8),
+    enabled: t.enabled,
+    readyState: t.readyState
+  })))
+  
+  console.log('[ScreenShareViewer] ✅ Setting srcObject')
+  videoRef.value.srcObject = stream
+  
+  videoRef.value.play().then(() => {
+    console.log('[ScreenShareViewer] ✅ Video playing successfully')
+  }).catch((e) => {
+    console.error('[ScreenShareViewer] ❌ Error playing:', e)
+  })
+  
+  // Force play after delay
+  setTimeout(() => {
+    if (videoRef.value && videoRef.value.srcObject) {
+      console.log('[ScreenShareViewer] 🔁 Force playing after 100ms')
+      videoRef.value.play().catch((e) => {
+        console.error('[ScreenShareViewer] ❌ Force play error:', e)
+      })
+    }
+  }, 100)
+}
+
+// Set initial stream after component is mounted
+onMounted(() => {
+  console.log('[ScreenShareViewer] ========== MOUNTED ==========')
+  console.log('[ScreenShareViewer] videoRef.value exists:', !!videoRef.value)
+  console.log('[ScreenShareViewer] Initial stream:', !!props.screenStream)
+  
+  nextTick(() => {
+    if (props.screenStream) {
+      console.log('[ScreenShareViewer] Setting initial stream after mount')
+      setVideoStream(props.screenStream)
+    }
+  })
+})
+
+// Watch for stream changes
+watch(() => props.screenStream, (newStream: any) => {
+  console.log('[ScreenShareViewer] ========== WATCH TRIGGERED ==========')
+  console.log('[ScreenShareViewer] newStream:', newStream)
+  console.log('[ScreenShareViewer] newStream is MediaStream?', newStream instanceof MediaStream)
   console.log('[ScreenShareViewer] Sharer name:', props.sharerName)
   
   nextTick(() => {
-    if (videoRef.value && newStream) {
-      console.log('[ScreenShareViewer] Setting srcObject, videoRef exists:', !!videoRef.value)
-      console.log('[ScreenShareViewer] Stream tracks:', newStream.getTracks().map(t => `${t.kind}: ${t.id}`))
-      
-      videoRef.value.srcObject = newStream
-      videoRef.value.play().catch((e) => {
-        console.error('[ScreenShareViewer] Error playing:', e)
-      })
-      console.log('[ScreenShareViewer] Set screen stream from:', props.sharerName)
-      
-      // Force play after delay like in index-backup.vue
-      setTimeout(() => {
-        if (videoRef.value && videoRef.value.srcObject) {
-          videoRef.value.play().catch(() => {})
-        }
-      }, 100)
-    } else {
-      console.log('[ScreenShareViewer] No videoRef or no stream')
-      console.log('[ScreenShareViewer] videoRef:', !!videoRef.value, 'newStream:', !!newStream)
-    }
+    setVideoStream(newStream)
   })
-}, { immediate: true })
+})
 </script>
