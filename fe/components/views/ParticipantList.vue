@@ -74,7 +74,7 @@
                 />
               </div>
               <!-- Host Crown Badge -->
-              <div
+              <!-- <div
                 v-if="participant.isHost"
                 class="absolute -top-1 -right-1 bg-yellow-400 rounded-full p-0.5"
                 title="Host"
@@ -83,9 +83,9 @@
                   name="material-symbols:crown"
                   class="text-[14px] text-white"
                 />
-              </div>
+              </div> -->
               <!-- Co-host Badge -->
-              <div
+              <!-- <div
                 v-else-if="participant.isCoHost"
                 class="absolute -top-1 -right-1 bg-blue-500 rounded-full p-0.5"
                 title="Co-host"
@@ -94,7 +94,7 @@
                   name="material-symbols:shield-person"
                   class="text-[14px] text-white"
                 />
-              </div>
+              </div> -->
             </div>
             <div>
               <p
