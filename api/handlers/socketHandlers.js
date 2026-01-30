@@ -16,6 +16,8 @@ import {
   renameParticipant,
   isHostOrCoHost,
   getHost,
+  setStreamType,
+  getAllStreamTypes,
 } from "./roomManager.js";
 
 /**
@@ -50,6 +52,9 @@ export function setupSocketHandlers(io, socket) {
     console.log(`[JOIN] Participants in room ${roomId}:`, participants);
     console.log(`[JOIN] Sending joined-room event to ${socket.id}`);
 
+    // Get stream types for all participants (for late joiners)
+    const streamTypes = getAllStreamTypes(roomId);
+    
     // Notify the user that just joined with current room state
     socket.emit("joined-room", {
       roomId,
@@ -61,6 +66,7 @@ export function setupSocketHandlers(io, socket) {
       whoIsRecording: roomState.whoIsRecording,
       host: roomState.host,
       coHosts: roomState.coHosts,
+      streamTypes, // ← Send stream mapping to late joiners
     });
 
     // Notify other users in the room about new user
@@ -148,23 +154,36 @@ export function setupSocketHandlers(io, socket) {
     console.log(`[MEDIA] ${socket.id} (${socket.data.username}) mic ${enabled ? 'enabled' : 'disabled'}`);
   });
 
-  socket.on("camera-toggled", ({ roomId, enabled }) => {
+  socket.on("camera-toggled", ({ roomId, enabled, streamId }) => {
+    // Track stream type in room state
+    if (enabled && streamId) {
+      setStreamType(roomId, socket.id, streamId, 'camera');
+    }
+    
     socket.to(roomId).emit("camera-toggled", { 
       socketId: socket.id,
       username: socket.data.username, 
-      enabled 
+      enabled,
+      streamId
     });
-    console.log(`[MEDIA] ${socket.id} (${socket.data.username}) camera ${enabled ? 'enabled' : 'disabled'}`);
+    console.log(`[MEDIA] ${socket.id} (${socket.data.username}) camera ${enabled ? 'enabled' : 'disabled'}${streamId ? ` (stream: ${streamId.substring(0, 8)})` : ''}`);
   });
 
   // Screen sharing
-  socket.on("sharing-started", ({ roomId }) => {
+  socket.on("sharing-started", ({ roomId, streamId }) => {
     setSharing(roomId, socket.id);
+    
+    // Track stream type in room state
+    if (streamId) {
+      setStreamType(roomId, socket.id, streamId, 'screen');
+    }
+    
     socket.to(roomId).emit("sharing-started", { 
       socketId: socket.id,
-      username: socket.data.username
+      username: socket.data.username,
+      streamId
     });
-    console.log(`socket ${socket.id} (${socket.data.username}) started sharing in room ${roomId}`);
+    console.log(`socket ${socket.id} (${socket.data.username}) started sharing in room ${roomId}${streamId ? ` (stream: ${streamId.substring(0, 8)})` : ''}`);
   });
 
   socket.on("stop-sharing", ({ roomId }) => {
@@ -177,7 +196,7 @@ export function setupSocketHandlers(io, socket) {
   });
 
   // Recording
-  socket.on("start-recording", ({ roomId }) => {
+  socket.on("recording-started", ({ roomId }) => {
     setRecording(roomId, socket.id);
     io.to(roomId).emit("recording-started", { 
       socketId: socket.id,
