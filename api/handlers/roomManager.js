@@ -16,6 +16,7 @@ export function getRoomState(roomId) {
       host: null, // Host socketId
       coHosts: [], // Array of co-host socketIds
       participants: {}, // { socketId: { username, socketId, isHost, isCoHost } }
+      streamTypes: {}, // { socketId: { cameraStreamId, screenStreamId } }
     };
   }
   return roomStates[roomId];
@@ -188,4 +189,27 @@ export function cleanupRoom(roomId) {
   if (roomState && Object.keys(roomState.participants).length === 0) {
     delete roomStates[roomId];
   }
+}
+
+/**
+ * Set stream type for a participant
+ */
+export function setStreamType(roomId, socketId, streamId, streamType) {
+  const roomState = getRoomState(roomId);
+  if (!roomState.streamTypes[socketId]) {
+    roomState.streamTypes[socketId] = {};
+  }
+  if (streamType === 'camera') {
+    roomState.streamTypes[socketId].cameraStreamId = streamId;
+  } else if (streamType === 'screen') {
+    roomState.streamTypes[socketId].screenStreamId = streamId;
+  }
+}
+
+/**
+ * Get all stream types (for late joiners)
+ */
+export function getAllStreamTypes(roomId) {
+  const roomState = getRoomState(roomId);
+  return roomState.streamTypes || {};
 }
