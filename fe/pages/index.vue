@@ -10,8 +10,9 @@
         <UIcon name="material-symbols:hub" class="text-primary text-2xl" />
         <span
           class="font-bold text-slate-900 dark:text-white text-sm tracking-wide"
-          >LetMeeting<span class="font-normal text-slate-500">.io</span></span
-        >
+          >LetMeeting
+          <!-- <span class="font-normal text-slate-500">.io</span> -->
+        </span>
       </div>
       <!-- Main Card Container -->
       <main class="w-full max-w-120 relative z-10">
@@ -99,7 +100,7 @@
               :disabled="isJoining || !username.trim() || !roomId.trim()"
               class="w-full flex items-center justify-center gap-2 bg-linear-to-b from-primary to-[#105ac0] hover:from-[#1766cc] hover:to-[#0d4a9e] text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-blue-500/25 active:scale-[0.98] transition-all duration-200 mt-2 group border-t border-white/20 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <span>{{ isJoining ? 'Joining...' : 'Join Meeting' }}</span>
+              <span>{{ isJoining ? "Joining..." : "Join Meeting" }}</span>
               <UIcon
                 name="material-symbols:arrow-forward"
                 class="text-[20px] group-hover:translate-x-0.5 transition-transform"
@@ -109,7 +110,8 @@
             <p
               class="text-xs text-center text-slate-400 dark:text-slate-500 pt-1"
             >
-              Made with ❤️ by <span class="font-semibold font-mono">Fajar Nur Hidayat</span>
+              Made with ❤️ by
+              <span class="font-semibold font-mono">Fajar Nur Hidayat</span>
             </p>
           </form>
           <!-- Footer Features -->
@@ -179,35 +181,36 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref } from "vue";
+import { useRouter } from "vue-router";
 
-const router = useRouter()
-const store = useMeetingStore()
-const username = ref('')
-const roomId = ref('123-456-789')
-const isJoining = ref(false)
+const router = useRouter();
+const store = useMeetingStore();
+const username = ref("");
+const roomId = ref("123-456-789");
+const isJoining = ref(false);
 
 const handleJoin = async () => {
-  if (!username.value.trim() || !roomId.value.trim()) return
-  
-  isJoining.value = true
-  
+  if (!username.value.trim() || !roomId.value.trim()) return;
+
+  isJoining.value = true;
+
   try {
+    store.username = username.value.trim();
+    localStorage.setItem("username", username.value.trim());
+
     // Navigate to meeting room with state
     await router.push({
       path: `/${roomId.value}`,
       // query: {
       //   username: username.value.trim()
       // }
-    })
-    store.username = username.value.trim()
-    localStorage.setItem('username', username.value.trim())
+    });
   } catch (error) {
-    console.error('Failed to join:', error)
-    isJoining.value = false
+    console.error("Failed to join:", error);
+    isJoining.value = false;
   }
-}
+};
 </script>
 
 <style scoped>
