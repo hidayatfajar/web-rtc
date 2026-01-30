@@ -36,10 +36,11 @@ export const useMeetingStore = defineStore("meeting", {
     isVideoOff: true, // Default OFF
     isScreenSharing: false,
     isRecording: false,
+    whoIsRecording: null as string | null, // socketId of who is recording
 
     // UI State
     showSidePanel: false,
-    tabActive: "participants" as "participants" | "chat",
+    tabActive: "participants" as "participants" | "chat" | "grid",
 
     // Chat
     messages: [] as ChatMessage[],
@@ -163,6 +164,17 @@ export const useMeetingStore = defineStore("meeting", {
       }
     },
 
+    // Shorthand to update video status
+    updateParticipantVideoStatus(socketId: string, isVideoOff: boolean) {
+      const participant = this.participants.find((p) => p.id === socketId);
+      if (participant) {
+        participant.isVideoOff = isVideoOff;
+        console.log(
+          `[Store] Updated video status for ${participant.name}: isVideoOff = ${isVideoOff}`,
+        );
+      }
+    },
+
     // Meeting Control Actions
     toggleMic() {
       this.isMuted = !this.isMuted;
@@ -190,8 +202,13 @@ export const useMeetingStore = defineStore("meeting", {
       this.isRecording = !this.isRecording;
     },
 
+    setRecordingStatus(isRecording: boolean, whoIsRecording: string | null = null) {
+      this.isRecording = isRecording;
+      this.whoIsRecording = whoIsRecording;
+    },
+
     // UI Actions
-    setTabActive(tab: "participants" | "chat") {
+    setTabActive(tab: "participants" | "chat" | "grid") {
       this.tabActive = tab;
       if (tab === "chat") {
         this.hasUnreadMessage = false;
@@ -203,6 +220,25 @@ export const useMeetingStore = defineStore("meeting", {
 
     toggleSidePanel() {
       this.showSidePanel = !this.showSidePanel;
+      // if( this.showSidePanel && this.tabActive === "chat") {
+      //   this.hasUnreadMessage = false;
+      // }
+
+      // if(this.isScreenSharing )
+
+      // handle open
+      // if (!this.showSidePanel) {
+      //   this.showSidePanel = true;
+      //   if (this.tabActive === "chat") {
+      //     this.hasUnreadMessage = false;
+      //   }
+      // } else {
+      //   // handle close
+      //   this.showSidePanel = false;
+      //   if (this.isScreenSharing) {
+      //     this.tabActive = "grid";
+      //   }
+      // }
     },
 
     // Chat Actions (not used anymore - receiveMessage handles all)
