@@ -809,6 +809,7 @@ const route = useRoute();
 const router = useRouter();
 const store = useMeetingStore();
 const toast = useAppToast();
+const config = useRuntimeConfig();
 
 // Get room ID from route
 const roomId = computed(() => route.params.id as string);
@@ -1585,7 +1586,7 @@ function stopRecording() {
 }
 
 async function uploadRecording() {
-  const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3001";
+  const apiUrl = (config.public.socketUrl as string) || "http://localhost:3001";
 
   if (recordedChunks.length === 0) {
     log("No chunks to upload");
@@ -1615,7 +1616,9 @@ async function uploadRecording() {
   try {
     log("Starting upload with fetch...");
     log(`API URL: ${apiUrl}/api/upload-recording`);
-    log(`FormData contents: recording (${blob.size} bytes), roomId (${roomId.value}), timestamp (${timestamp})`);
+    log(
+      `FormData contents: recording (${blob.size} bytes), roomId (${roomId.value}), timestamp (${timestamp})`,
+    );
 
     const response = await fetch(`${apiUrl}/api/upload-recording`, {
       method: "POST",
@@ -1634,7 +1637,9 @@ async function uploadRecording() {
     if (!response.ok) {
       const errorText = await response.text();
       log(`Error response body: ${errorText}`);
-      throw new Error(`Upload failed with status ${response.status}: ${errorText}`);
+      throw new Error(
+        `Upload failed with status ${response.status}: ${errorText}`,
+      );
     }
 
     const contentType = response.headers.get("content-type");
@@ -1651,7 +1656,10 @@ async function uploadRecording() {
     }
 
     // Check if upload was successful - either has success=true OR has url+filename
-    if (result && (result.success === true || (result.url && result.filename))) {
+    if (
+      result &&
+      (result.success === true || (result.url && result.filename))
+    ) {
       log(`✅ Recording saved: ${result.filename}`);
       log(`📹 URL: ${result.url}`);
       log(`📦 Size: ${result.size} bytes`);
