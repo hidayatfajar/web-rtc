@@ -9,6 +9,10 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       socketUrl: process.env.NUXT_PUBLIC_SOCKET_URL || "http://localhost:3001",
+      stunServers: process.env.NUXT_PUBLIC_STUN_SERVERS || "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302",
+      turnUrl: process.env.NUXT_PUBLIC_TURN_URL || "",
+      turnUsername: process.env.NUXT_PUBLIC_TURN_USERNAME || "",
+      turnCredential: process.env.NUXT_PUBLIC_TURN_CREDENTIAL || "",
     },
   },
   // devServer: {
