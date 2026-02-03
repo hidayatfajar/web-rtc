@@ -11,6 +11,9 @@ export default defineNuxtConfig({
       socketUrl: process.env.NUXT_PUBLIC_SOCKET_URL || "http://localhost:3001",
     },
   },
+  // devServer: {
+  //   port: 3002,
+  // },
 
   colorMode: {
     dataValue: "theme",
