@@ -9,18 +9,12 @@
       >
         Add people
       </p>
-      <div class="flex gap-2">
+      <div class="flex gap-2" @click="handleCopylink">
         <button
-          class="flex-1 flex items-center justify-center gap-2 h-9 rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-600 hover:scale-105 active:scale-95 transition-all duration-200"
+          class="flex-1 flex items-center justify-center gap-2 h-9 rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-600 hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer"
         >
           <UIcon name="material-symbols:content-copy" class="text-[18px]" />
           Copy Link
-        </button>
-        <button
-          class="flex-1 flex items-center justify-center gap-2 h-9 rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-600 hover:scale-105 active:scale-95 transition-all duration-200"
-        >
-          <UIcon name="material-symbols:mail" class="text-[18px]" />
-          Email
         </button>
       </div>
     </div>
@@ -53,7 +47,7 @@
                   backgroundImage: `url('${participant.avatar}')`,
                 }"
               ></div>
-              <div
+              <!-- <div
                 v-if="!participant.isMuted || participant.isSpeaking"
                 class="absolute -bottom-1 -right-1 bg-white dark:bg-surface-dark rounded-full p-0.5"
               >
@@ -72,7 +66,7 @@
                   "
                   class="text-[14px]"
                 />
-              </div>
+              </div> -->
               <!-- Host Crown Badge -->
               <!-- <div
                 v-if="participant.isHost"
@@ -228,6 +222,7 @@ interface Props {
   onRename?: (newName: string) => void;
 }
 
+const toast = useAppToast();
 const props = withDefaults(defineProps<Props>(), {
   isHost: false,
   isCoHost: false,
@@ -287,6 +282,24 @@ const handleRename = () => {
     showRenameDialog.value = false;
     newUsername.value = "";
   }
+};
+
+const handleCopylink = () => {
+  const meetingLink = window.location.href;
+  navigator.clipboard
+    .writeText(meetingLink)
+    .then(() => {
+      console.log("[ParticipantList] ✅ Meeting link copied to clipboard");
+      // Optionally, show a toast notification here
+      toast.success("Meeting link copied to clipboard!");
+    })
+    .catch((err) => {
+      console.error(
+        "[ParticipantList] ❌ Failed to copy meeting link:",
+        err,
+      );
+      toast.error("Failed to copy meeting link. Please try again.");
+    });
 };
 </script>
 
