@@ -43,6 +43,10 @@ export const useWebRTC = (
   const participants = ref<Participant[]>([]);
   const hostSocketId = ref<string | null>(null);
   const coHostSocketIds = ref<string[]>([]);
+  
+  // Audio detection
+  let audioContext: AudioContext | null = null;
+  const audioAnalyzers = new Map<string, { analyser: AnalyserNode; dataArray: Uint8Array; checkInterval: NodeJS.Timeout }>();
 
   // Config
   const config = useRuntimeConfig();
@@ -71,6 +75,104 @@ export const useWebRTC = (
   };
 
   /**
+   * Setup audio detection untuk stream
+   */
+  const setupAudioDetection = (stream: MediaStream, participantId: string, isLocal: boolean = false) => {
+    try {
+      // Stop existing analyzer jika ada
+      if (audioAnalyzers.has(participantId)) {
+        const existing = audioAnalyzers.get(participantId);
+        if (existing) {
+          clearInterval(existing.checkInterval);
+          audioAnalyzers.delete(participantId);
+        }
+      }
+
+      const audioTracks = stream.getAudioTracks();
+      if (audioTracks.length === 0) {
+        console.log(`[Audio] No audio track for ${participantId}`);
+        return;
+      }
+
+      // Initialize AudioContext jika belum ada
+      if (!audioContext) {
+        audioContext = new AudioContext();
+      }
+
+      // Resume jika suspended
+      if (audioContext.state === 'suspended') {
+        audioContext.resume();
+      }
+
+      // Create analyzer
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 512;
+      analyser.smoothingTimeConstant = 0.8;
+      
+      const source = audioContext.createMediaStreamSource(stream);
+      source.connect(analyser);
+      
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      
+      // Debounce state to prevent flicker
+      let currentSpeakingState = false;
+      let speakingChangeDebounce: NodeJS.Timeout | null = null;
+      
+      // Check audio level setiap 200ms (reduced frequency)
+      const checkInterval = setInterval(() => {
+        analyser.getByteFrequencyData(dataArray);
+        
+        // Calculate average volume
+        const average = dataArray.reduce((sum, value) => sum + value, 0) / dataArray.length;
+        const isSpeaking = average > 12; // Slightly higher threshold
+        
+        // Only update if state changes and debounce it
+        if (isSpeaking !== currentSpeakingState) {
+          if (speakingChangeDebounce) {
+            clearTimeout(speakingChangeDebounce);
+          }
+          
+          // Wait 300ms before actually changing state to prevent rapid flickering
+          speakingChangeDebounce = setTimeout(() => {
+            currentSpeakingState = isSpeaking;
+            
+            // Update store
+            if (isLocal) {
+              const you = store.participants.find(p => p.isYou);
+              if (you) {
+                you.isSpeaking = isSpeaking;
+              }
+            } else {
+              const participant = store.participants.find(p => p.id === participantId);
+              if (participant) {
+                participant.isSpeaking = isSpeaking;
+              }
+            }
+          }, 300);
+        }
+      }, 200); // Check every 200ms instead of 100ms
+      
+      audioAnalyzers.set(participantId, { analyser, dataArray, checkInterval });
+      console.log(`[Audio] Detection setup for ${isLocal ? 'local' : participantId}`);
+      
+    } catch (error) {
+      console.error(`[Audio] Failed to setup detection for ${participantId}:`, error);
+    }
+  };
+
+  /**
+   * Stop audio detection untuk participant
+   */
+  const stopAudioDetection = (participantId: string) => {
+    const analyzer = audioAnalyzers.get(participantId);
+    if (analyzer) {
+      clearInterval(analyzer.checkInterval);
+      audioAnalyzers.delete(participantId);
+      console.log(`[Audio] Detection stopped for ${participantId}`);
+    }
+  };
+
+  /**
    * Initialize local media stream (camera + mic)
    */
   const initializeLocalStream = async () => {
@@ -91,6 +193,21 @@ export const useWebRTC = (
       // Disable tracks by default
       stream.getAudioTracks().forEach((track) => (track.enabled = false));
       stream.getVideoTracks().forEach((track) => (track.enabled = false));
+
+      // Setup track state listeners untuk sync icon dengan actual state
+      stream.getAudioTracks().forEach((track) => {
+        track.addEventListener('ended', () => {
+          console.log('[WebRTC] Audio track ended, syncing state');
+          store.isMuted = true;
+        });
+      });
+      
+      stream.getVideoTracks().forEach((track) => {
+        track.addEventListener('ended', () => {
+          console.log('[WebRTC] Video track ended, syncing state');
+          store.isVideoOff = true;
+        });
+      });
 
       localStream.value = stream;
       console.log(
@@ -229,6 +346,15 @@ export const useWebRTC = (
         stream.getAudioTracks().length,
         "audio tracks",
       );
+      
+      // Setup audio detection jika ada audio track
+      if (event.track.kind === 'audio' && stream.getAudioTracks().length > 0) {
+        console.log('[WebRTC] 🎤 Audio track detected, setting up audio detection');
+        // Delay sedikit untuk ensure stream ready
+        setTimeout(() => {
+          setupAudioDetection(stream, remoteSocketId, false);
+        }, 500);
+      }
 
       // 🎯 Check stream type from mapping (set by socket events)
       const streamType = streamTypeMap.get(streamId);
@@ -714,6 +840,41 @@ export const useWebRTC = (
 
         // DON'T initialize local stream automatically - let user enable camera/mic manually
         // This prevents sending disabled tracks to peers
+        
+        // Restore state dari localStorage (untuk refresh scenario)
+        const savedMicState = localStorage.getItem(`${roomId}_micState`);
+        const savedCamState = localStorage.getItem(`${roomId}_camState`);
+        
+        if (savedMicState === 'true' || savedCamState === 'true') {
+          console.log('[Socket] Detected saved media state, will restore after peers connected');
+          console.log('[Socket] Saved mic:', savedMicState, 'cam:', savedCamState);
+          
+          // Delay restoration untuk ensure peers ready
+          setTimeout(async () => {
+            try {
+              // Initialize stream jika belum ada
+              if (!localStream.value) {
+                await initializeLocalStream();
+              }
+              
+              // Restore mic state
+              if (savedMicState === 'true' && store.isMuted) {
+                console.log('[Socket] 🎤 Restoring mic to ON');
+                await toggleMic();
+              }
+              
+              // Restore camera state
+              if (savedCamState === 'true' && store.isVideoOff) {
+                console.log('[Socket] 📹 Restoring camera to ON');
+                await toggleVideo();
+              }
+              
+              console.log('[Socket] ✅ Media state restored from localStorage');
+            } catch (error) {
+              console.error('[Socket] Failed to restore media state:', error);
+            }
+          }, 1500);
+        }
 
         // Create offers to existing participants (except yourself)
         // Only if we already have media (which we don't on first join - that's OK)
@@ -808,6 +969,9 @@ export const useWebRTC = (
           (p) => p.id === disconnectedSocketId,
         );
         store.removeParticipant(disconnectedSocketId);
+        
+        // Stop audio detection
+        stopAudioDetection(disconnectedSocketId);
 
         // Update participants in store
         participants.value = participantsList;
@@ -1161,6 +1325,9 @@ export const useWebRTC = (
    */
   const toggleMic = async () => {
     if (!socket) return;
+    
+    // Deklarasi mySocketId sekali di awal
+    const mySocketId = socket.id || 'local';
 
     if (store.isMuted) {
       // Enable mic - add audio track
@@ -1195,6 +1362,14 @@ export const useWebRTC = (
         store.isMuted = false;
         const you = store.participants.find((p) => p.isYou);
         if (you) you.isMuted = false;
+        
+        // Setup track listener untuk sync state
+        audioTrack.addEventListener('ended', () => {
+          console.log('[Media] Audio track ended, syncing state');
+          store.isMuted = true;
+          const you = store.participants.find((p) => p.isYou);
+          if (you) you.isMuted = true;
+        });
 
         // Add to all existing peer connections
         peerConnections.forEach((pc) => {
@@ -1202,7 +1377,6 @@ export const useWebRTC = (
         });
 
         // Create offers for ALL participants (like index-backup.vue)
-        const mySocketId = socket.id;
         for (const participant of store.participants) {
           const peerId = participant.id;
           if (peerId !== mySocketId) {
@@ -1211,6 +1385,12 @@ export const useWebRTC = (
         }
 
         console.log("[Media] Mic enabled");
+
+        // Setup audio detection untuk local stream
+        setupAudioDetection(localStream.value!, mySocketId, true);
+        
+        // Save state to localStorage
+        localStorage.setItem(`${roomId}_micState`, 'true');
 
         // Broadcast status AFTER creating offers
         socket.emit("mic-toggled", { roomId: store.roomId, enabled: true });
@@ -1242,7 +1422,6 @@ export const useWebRTC = (
         if (you) you.isMuted = true;
 
         // Create offers for ALL participants
-        const mySocketId = socket.id;
         for (const participant of store.participants) {
           const peerId = participant.id;
           if (peerId !== mySocketId) {
@@ -1251,6 +1430,12 @@ export const useWebRTC = (
         }
 
         console.log("[Media] Mic disabled");
+        
+        // Stop audio detection
+        stopAudioDetection(mySocketId);
+        
+        // Save state to localStorage
+        localStorage.setItem(`${roomId}_micState`, 'false');
 
         // Broadcast status
         socket.emit("mic-toggled", { roomId: store.roomId, enabled: false });
@@ -1284,6 +1469,14 @@ export const useWebRTC = (
         } else {
           localStream.value = new MediaStream([videoTrack]);
         }
+        
+        // Setup track listener untuk sync state
+        videoTrack.addEventListener('ended', () => {
+          console.log('[Media] Video track ended, syncing state');
+          store.isVideoOff = true;
+          const you = store.participants.find((p) => p.isYou);
+          if (you) you.isVideoOff = true;
+        });
 
         // Add track to ALL existing peer connections
         peerConnections.forEach((pc, peerId) => {
@@ -1313,6 +1506,9 @@ export const useWebRTC = (
         }
 
         console.log("[Media] Camera enabled");
+        
+        // Save state to localStorage
+        localStorage.setItem(`${roomId}_camState`, 'true');
 
         socket.emit("camera-toggled", {
           roomId: store.roomId,
@@ -1357,6 +1553,9 @@ export const useWebRTC = (
     }
 
     console.log("[Media] Camera disabled");
+    
+    // Save state to localStorage
+    localStorage.setItem(`${roomId}_camState`, 'false');
 
     socket.emit("camera-toggled", {
       roomId: store.roomId,
@@ -1423,6 +1622,11 @@ export const useWebRTC = (
 
         store.isScreenSharing = true;
         store.setTabActive("grid");
+        
+        // Auto-open sidebar untuk show participant thumbnails
+        if (!store.showSidePanel) {
+          store.toggleSidePanel();
+        }
 
         const mySocketId = socket.id;
         whoIsSharing.value = mySocketId || null;
