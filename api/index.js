@@ -8,8 +8,6 @@ import http from "http";
 import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
-
-// Import handlers
 import { setupSocketHandlers } from "./handlers/socketHandlers.js";
 import { upload, handleUpload, listRecordings } from "./handlers/uploadHandler.js";
 
@@ -18,7 +16,7 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Environment configuration
+// env configuration
 const PORT = process.env.PORT || 3001;
 const HOST = process.env.HOST || "0.0.0.0";
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
@@ -29,7 +27,6 @@ const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
 const app = express();
 const server = http.createServer(app);
 
-// CORS middleware for all routes
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (ALLOWED_ORIGINS.includes(origin) || ALLOWED_ORIGINS.includes("*")) {
@@ -44,11 +41,9 @@ app.use((req, res, next) => {
   next();
 });
 
-// Serve recordings as static files
 app.use("/recordings", express.static(path.join(__dirname, "recordings")));
 app.use(express.json());
 
-// Socket.IO setup
 const io = new Server(server, {
   cors: {
     origin: ALLOWED_ORIGINS.includes("*") ? "*" : ALLOWED_ORIGINS,
@@ -57,31 +52,23 @@ const io = new Server(server, {
   },
 });
 
-// Setup socket event handlers
 io.on("connection", (socket) => {
   setupSocketHandlers(io, socket);
 });
 
-// === API Routes ===
-
-// Debug: List all active rooms
 app.get("/debug/rooms", (req, res) => {
   const rooms = {};
   for (const [name, set] of io.sockets.adapter.rooms) {
-    // Filter: ignore auto rooms (socket.id)
     if (io.sockets.sockets.get(name)) continue;
     rooms[name] = Array.from(set);
   }
   res.json(rooms);
 });
 
-// Upload recording endpoint
 app.post("/api/upload-recording", upload.single("recording"), handleUpload);
 
-// List all recordings
 app.get("/api/recordings", listRecordings);
 
-// Health check endpoint
 app.get("/health", (req, res) => {
   res.json({
     status: "ok",
@@ -97,7 +84,6 @@ app.get("/health", (req, res) => {
   });
 });
 
-// Root endpoint
 app.get("/", (req, res) => {
   res.json({
     status: "ok",
@@ -113,7 +99,6 @@ app.get("/", (req, res) => {
   });
 });
 
-// Start server
 server.listen(PORT, HOST, () => {
   console.log(`🚀 Server running on ${HOST}:${PORT}`);
   console.log(`📁 Base URL: ${BASE_URL}`);

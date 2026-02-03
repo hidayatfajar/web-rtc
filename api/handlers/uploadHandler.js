@@ -1,6 +1,3 @@
-/**
- * Upload Handler - Handles file upload configuration and endpoints
- */
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -9,7 +6,7 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Multer storage configuration
+// multer storage configuration
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     console.log("[MULTER] Setting destination for file...");
@@ -31,8 +28,6 @@ const storage = multer.diskStorage({
     console.log(`[MULTER] Original filename: ${file.originalname}`);
     console.log(`[MULTER] Mimetype: ${file.mimetype}`);
 
-    // Extract roomId from original filename (format: room-{roomId}-{timestamp}.webm)
-    const match = file.originalname.match(/^room-(.+?)-\d{4}-/);
     const roomId = match ? match[1] : "unknown";
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -49,9 +44,6 @@ export const upload = multer({
   limits: { fileSize: 500 * 1024 * 1024 }, // 500MB max
 });
 
-/**
- * Handle file upload endpoint
- */
 export function handleUpload(req, res) {
   console.log("[UPLOAD] Upload endpoint called");
   console.log("[UPLOAD] Headers:", JSON.stringify(req.headers, null, 2));
@@ -84,9 +76,6 @@ export function handleUpload(req, res) {
   });
 }
 
-/**
- * List all recordings
- */
 export function listRecordings(req, res) {
   const recordingsDir = path.join(__dirname, "..", "recordings");
 
