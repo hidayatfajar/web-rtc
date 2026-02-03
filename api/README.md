@@ -667,11 +667,6 @@ Gunakan Socket.IO client atau tools seperti:
 - [Socket.IO Client Tool](https://amritb.github.io/socketio-client-tool/)
 - Postman (support WebSocket)
 
-## 👨‍💻 Developer
-
-**Fajar Nur Hidayat**
-- Author & Main Developer
-
 ## 📄 License
 
 ISC License

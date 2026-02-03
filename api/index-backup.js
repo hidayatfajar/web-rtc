@@ -419,7 +419,6 @@ app.get("/health", (req, res) => {
       day: "numeric",
     }),
     type: "webrtc-api v1.0",
-    author: "Fajar Nur Hidayat (Ganteng)",
   });
 });
 
@@ -435,7 +434,6 @@ app.get("/", (req, res) => {
       day: "numeric",
     }),
     type: "webrtc-api v1.0",
-    author: "Fajar Nur Hidayat (Ganteng)",
   });
 });
 

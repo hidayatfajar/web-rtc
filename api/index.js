@@ -1,7 +1,3 @@
-/**
- * WebRTC Meeting Server - Clean & Modular Architecture
- * Author: Fajar Nur Hidayat
- */
 import { Server } from "socket.io";
 import express from "express";
 import http from "http";
@@ -80,7 +76,6 @@ app.get("/health", (req, res) => {
       day: "numeric",
     }),
     type: "webrtc-api v1.0",
-    author: "Fajar Nur Hidayat (Ganteng)",
   });
 });
 
@@ -95,7 +90,6 @@ app.get("/", (req, res) => {
       day: "numeric",
     }),
     type: "webrtc-api v1.0",
-    author: "Fajar Nur Hidayat (Ganteng)",
   });
 });
 
