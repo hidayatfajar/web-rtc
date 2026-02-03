@@ -154,7 +154,7 @@
 
           <!-- Right Actions -->
           <div class="flex items-center gap-3">
-            <button
+            <!-- <button
               class="flex items-center justify-center h-9 px-4 rounded-full bg-primary text-white text-sm font-bold hover:bg-blue-700 hover:scale-105 active:scale-95 transition-all duration-200 shadow-sm shadow-blue-200 dark:shadow-none"
             >
               <UIcon
@@ -162,7 +162,7 @@
                 class="text-[18px] mr-2"
               />
               Invite
-            </button>
+            </button> -->
             <button
               class="flex items-center justify-center w-9 h-9 rounded-full bg-surface-light dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 hover:rotate-90 transition-all duration-300"
             >
@@ -200,21 +200,18 @@
                 :grid-class="store.gridClass"
                 :local-stream="localStreamComputed"
                 :remote-streams="remoteStreamsComputed"
-              />
-            </transition>
-
-            <!-- Floating Bottom Control Bar -->
-            <div class="absolute bottom-8 left-1/2 -translate-x-1/2 z-30">
-              <div
-                class="flex items-center gap-3 p-2 bg-white/60 dark:bg-surface-dark rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-200 dark:border-slate-700 backdrop-blur-sm bg-opacity-95 dark:bg-opacity-95"
               >
-                <button
-                  @click="handleToggleMic"
-                  class="group relative w-12 h-12 rounded-full flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 hover:scale-110 active:scale-95 transition-all duration-200"
-                  :title="
-                    store.isMuted ? 'Unmute Microphone' : 'Mute Microphone'
-                  "
-                >
+                <template #controls>
+                  <div
+                    class="flex items-center gap-3 p-2 bg-white/60 dark:bg-surface-dark rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-200 dark:border-slate-700 backdrop-blur-sm bg-opacity-95 dark:bg-opacity-95"
+                  >
+                    <button
+                      @click="handleToggleMic"
+                      class="cursor-pointer group relative w-12 h-12 rounded-full flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 hover:scale-110 active:scale-95 transition-all duration-200"
+                      :title="
+                        store.isMuted ? 'Unmute Microphone' : 'Mute Microphone'
+                      "
+                    >
                   <transition
                     mode="out-in"
                     enter-active-class="transition-all duration-150"
@@ -242,7 +239,7 @@
                 </button>
                 <button
                   @click="handleToggleVideo"
-                  class="group relative w-12 h-12 rounded-full flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 hover:scale-110 active:scale-95 transition-all duration-200"
+                  class="cursor-pointer group relative w-12 h-12 rounded-full flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 hover:scale-110 active:scale-95 transition-all duration-200"
                   :title="
                     store.isVideoOff ? 'Turn On Camera' : 'Turn Off Camera'
                   "
@@ -271,7 +268,7 @@
                 <button
                   @click="handleToggleScreenShare"
                   :disabled="isSomeoneElseSharing"
-                  class="group relative w-12 h-12 rounded-full flex items-center justify-center hover:scale-110 active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                  class="cursor-pointer group relative w-12 h-12 rounded-full flex items-center justify-center hover:scale-110 active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                   :class="
                     store.isScreenSharing && !isSomeoneElseSharing
                       ? 'bg-red-100 text-red-500 hover:bg-red-200'
@@ -340,7 +337,7 @@
                 </button>
                 <button
                   @click="store.setTabActive('chat')"
-                  class="group relative w-12 h-12 rounded-full flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 hover:scale-110 active:scale-95 transition-all duration-200"
+                  class="cursor-pointer group relative w-12 h-12 rounded-full flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 hover:scale-110 active:scale-95 transition-all duration-200"
                   :title="
                     store.tabActive === 'chat' && store.showSidePanel
                       ? 'Hide Chat'
@@ -372,14 +369,16 @@
                 <div class="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1"></div>
                 <button
                   @click="handleLeave"
-                  class="w-16 h-12 rounded-full flex items-center justify-center bg-danger text-white bg-red-500 hover:bg-red-700 hover:scale-110 active:scale-95 shadow-md shadow-red-200 dark:shadow-none transition-all duration-200"
+                  class="cursor-pointer w-16 h-12 rounded-full flex items-center justify-center bg-danger text-white bg-red-500 hover:bg-red-700 hover:scale-110 active:scale-95 shadow-md shadow-red-200 dark:shadow-none transition-all duration-200"
                   title="End Call"
                 >
                   <UIcon name="material-symbols:call-end" class="size-6" />
                 </button>
               </div>
-            </div>
-          </div>
+            </template>
+          </ParticipantGrid>
+        </transition>
+      </div>
 
           <!-- Sidebar (25%) -->
           <transition
@@ -1281,6 +1280,7 @@ async function startRecording() {
                 s.label === participant.id,
             );
 
+            // ALWAYS draw participant - dengan video atau placeholder
             if (participantVideo) {
               const videoEl = participantVideo.element;
 
@@ -1306,7 +1306,7 @@ async function startRecording() {
                 ctx.fillRect(x, y, cellWidth, cellHeight);
                 ctx.drawImage(videoEl, drawX, drawY, drawWidth, drawHeight);
               } else {
-                // Placeholder
+                // Video element exists tapi not ready - show placeholder
                 ctx.fillStyle = "#1a1a1a";
                 ctx.fillRect(x, y, cellWidth, cellHeight);
                 ctx.fillStyle = "#555";
@@ -1316,7 +1316,7 @@ async function startRecording() {
                 ctx.fillText("👤", x + cellWidth / 2, y + cellHeight / 2);
               }
             } else {
-              // Camera off placeholder
+              // Camera OFF - TETAP DRAW PLACEHOLDER
               ctx.fillStyle = "#1a1a1a";
               ctx.fillRect(x, y, cellWidth, cellHeight);
               ctx.fillStyle = "#555";
@@ -1333,7 +1333,7 @@ async function startRecording() {
               );
             }
 
-            // Draw name label
+            // ALWAYS draw name label untuk setiap participant
             ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
             ctx.fillRect(x + 10, y + cellHeight - 40, 150, 30);
             ctx.fillStyle = "#fff";
