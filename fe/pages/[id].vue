@@ -187,12 +187,192 @@
               leave-from-class="opacity-100 scale-100"
               leave-to-class="opacity-0 scale-95"
             >
-              <ScreenShareViewer
+              <div
                 v-if="store.isScreenSharing"
                 key="screen-share"
-                :screen-stream="screenShareStream"
-                :sharer-name="screenSharerName"
-              />
+                class="relative w-full h-full flex items-center justify-center"
+                @mouseenter="handleScreenShareHover"
+                @mouseleave="handleScreenShareLeave"
+              >
+                <ScreenShareViewer
+                  :screen-stream="screenShareStream"
+                  :sharer-name="screenSharerName"
+                />
+                
+                <!-- Floating Control Bar for Screen Share -->
+                <transition
+                  enter-active-class="transition-all duration-300 ease-out"
+                  leave-active-class="transition-all duration-200 ease-in"
+                  enter-from-class="translate-y-full opacity-0"
+                  enter-to-class="translate-y-0 opacity-100"
+                  leave-from-class="translate-y-0 opacity-100"
+                  leave-to-class="translate-y-full opacity-0"
+                >
+                  <div
+                    v-if="showScreenShareControls"
+                    class="absolute bottom-6 left-1/2 -translate-x-1/2 z-50"
+                  >
+                    <div
+                      class="flex items-center gap-3 p-2 bg-white/60 dark:bg-surface-dark rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-200 dark:border-slate-700 backdrop-blur-sm bg-opacity-95 dark:bg-opacity-95"
+                    >
+                      <button
+                        @click="handleToggleMic"
+                        class="cursor-pointer group relative w-12 h-12 rounded-full flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 hover:scale-110 active:scale-95 transition-all duration-200"
+                        :title="
+                          store.isMuted ? 'Unmute Microphone' : 'Mute Microphone'
+                        "
+                      >
+                        <transition
+                          mode="out-in"
+                          enter-active-class="transition-all duration-150"
+                          leave-active-class="transition-all duration-150"
+                          enter-from-class="scale-0 rotate-180"
+                          enter-to-class="scale-100 rotate-0"
+                          leave-from-class="scale-100 rotate-0"
+                          leave-to-class="scale-0 -rotate-180"
+                        >
+                          <UIcon
+                            :key="store.isMuted ? 'muted' : 'unmuted'"
+                            :name="
+                              store.isMuted
+                                ? 'material-symbols:mic-off'
+                                : 'material-symbols:mic'
+                            "
+                            class="size-6"
+                          />
+                        </transition>
+                      </button>
+                      <button
+                        @click="handleToggleVideo"
+                        class="cursor-pointer group relative w-12 h-12 rounded-full flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 hover:scale-110 active:scale-95 transition-all duration-200"
+                        :title="
+                          store.isVideoOff ? 'Turn On Camera' : 'Turn Off Camera'
+                        "
+                      >
+                        <transition
+                          mode="out-in"
+                          enter-active-class="transition-all duration-150"
+                          leave-active-class="transition-all duration-150"
+                          enter-from-class="scale-0 rotate-180"
+                          enter-to-class="scale-100 rotate-0"
+                          leave-from-class="scale-100 rotate-0"
+                          leave-to-class="scale-0 -rotate-180"
+                        >
+                          <UIcon
+                            :key="store.isVideoOff ? 'off' : 'on'"
+                            :name="
+                              store.isVideoOff
+                                ? 'material-symbols:videocam-off'
+                                : 'material-symbols:videocam'
+                            "
+                            class="size-6"
+                          />
+                        </transition>
+                      </button>
+                      <div class="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1"></div>
+                      <button
+                        @click="handleToggleScreenShare"
+                        :disabled="isSomeoneElseSharing"
+                        class="cursor-pointer group relative w-12 h-12 rounded-full flex items-center justify-center hover:scale-110 active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                        :class="
+                          store.isScreenSharing && !isSomeoneElseSharing
+                            ? 'bg-red-100 text-red-500 hover:bg-red-200'
+                            : 'bg-primary/10 text-primary hover:bg-primary/20'
+                        "
+                        :title="
+                          isSomeoneElseSharing
+                            ? 'Someone else is sharing'
+                            : store.isScreenSharing
+                              ? 'Stop Sharing'
+                              : 'Share Screen'
+                        "
+                      >
+                        <transition
+                          mode="out-in"
+                          enter-active-class="transition-all duration-150"
+                          leave-active-class="transition-all duration-150"
+                          enter-from-class="scale-0 rotate-180"
+                          enter-to-class="scale-100 rotate-0"
+                          leave-from-class="scale-100 rotate-0"
+                          leave-to-class="scale-0 -rotate-180"
+                        >
+                          <UIcon
+                            :key="store.isScreenSharing ? 'stop' : 'start'"
+                            :name="
+                              store.isScreenSharing && !isSomeoneElseSharing
+                                ? 'material-symbols:cancel-presentation'
+                                : 'material-symbols:present-to-all'
+                            "
+                            class="size-6"
+                          />
+                        </transition>
+                      </button>
+                      <button
+                        @click="handleToggleRecording"
+                        :disabled="!isHost && !isCoHost"
+                        class="group relative w-12 h-12 rounded-full flex items-center justify-center hover:scale-110 active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                        :class="
+                          recording
+                            ? 'bg-red-100 dark:bg-red-900/30 text-red-500 hover:bg-red-200 dark:hover:bg-red-900/50'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700'
+                        "
+                        :title="
+                          !isHost && !isCoHost
+                            ? 'Only host or co-host can record'
+                            : recording
+                              ? 'Stop Recording'
+                              : 'Record'
+                        "
+                      >
+                        <UIcon
+                          name="material-symbols:radio-button-checked"
+                          class="size-6"
+                          :class="recording ? 'animate-pulse' : ''"
+                        />
+                      </button>
+                      <button
+                        @click="store.setTabActive('chat')"
+                        class="cursor-pointer group relative w-12 h-12 rounded-full flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 hover:scale-110 active:scale-95 transition-all duration-200"
+                        :title="
+                          store.tabActive === 'chat' && store.showSidePanel
+                            ? 'Hide Chat'
+                            : 'Show Chat'
+                        "
+                      >
+                        <UIcon
+                          :name="
+                            store.tabActive === 'chat' && store.showSidePanel
+                              ? 'material-symbols:chat-bubble-outline'
+                              : 'material-symbols:chat-bubble'
+                          "
+                          class="size-6"
+                        />
+                        <transition
+                          enter-active-class="transition-all duration-200"
+                          leave-active-class="transition-all duration-200"
+                          enter-from-class="scale-0 opacity-0"
+                          enter-to-class="scale-100 opacity-100"
+                          leave-from-class="scale-100 opacity-100"
+                          leave-to-class="scale-0 opacity-0"
+                        >
+                          <span
+                            v-if="store.hasUnreadMessage"
+                            class="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-surface-dark"
+                          ></span>
+                        </transition>
+                      </button>
+                      <div class="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1"></div>
+                      <button
+                        @click="handleLeave"
+                        class="cursor-pointer w-16 h-12 rounded-full flex items-center justify-center bg-danger text-white bg-red-500 hover:bg-red-700 hover:scale-110 active:scale-95 shadow-md shadow-red-200 dark:shadow-none transition-all duration-200"
+                        title="End Call"
+                      >
+                        <UIcon name="material-symbols:call-end" class="size-6" />
+                      </button>
+                    </div>
+                  </div>
+                </transition>
+              </div>
               <ParticipantGrid
                 v-else
                 key="grid"
@@ -908,6 +1088,25 @@ const recordingDuration = ref(0);
 let recordingTimer: NodeJS.Timeout | null = null;
 let mediaRecorder: MediaRecorder | null = null;
 let recordedChunks: Blob[] = [];
+
+// ============= HOVER STATE FOR SCREEN SHARE CONTROLS =============
+const showScreenShareControls = ref(false);
+let screenShareHoverTimeout: NodeJS.Timeout | null = null;
+
+const handleScreenShareHover = () => {
+  if (screenShareHoverTimeout) {
+    clearTimeout(screenShareHoverTimeout);
+    screenShareHoverTimeout = null;
+  }
+  showScreenShareControls.value = true;
+};
+
+const handleScreenShareLeave = () => {
+  // Delay hiding controls slightly
+  screenShareHoverTimeout = setTimeout(() => {
+    showScreenShareControls.value = false;
+  }, 300);
+};
 
 // Modal states
 const showStopRecordingModal = ref(false);
