@@ -79,7 +79,7 @@ export const useMeetingStore = defineStore("meeting", {
     // Initialize meeting
     initMeeting(roomId: string, username: string, socketId: string) {
       this.roomId = roomId;
-      this.roomName = `Room ${roomId}`;
+      this.roomName = roomId; // Hapus prefix "Room"
       this.username = username;
       this.socketId = socketId;
 
@@ -341,23 +341,23 @@ export const useMeetingStore = defineStore("meeting", {
       }
     },
 
-    // resetMeeting() {
-    //   this.roomName = "";
-    //   this.roomId = "";
+    resetMeeting() {
+      this.roomName = "";
+      this.roomId = "";
 
-    //   this.username = "";
-    //   this.socketId = "";
-    //   this.participants = [];
-    //   this.isMuted = true;
-    //   this.isVideoOff = true;
-    //   this.isScreenSharing = false;
-    //   this.isRecording = false;
-    //   this.showSidePanel = false;
-    //   this.tabActive = "participants";
-    //   this.messages = [];
-    //   this.hasUnreadMessage = false;
+      this.username = "";
+      this.socketId = "";
+      this.participants = [];
+      this.isMuted = true;
+      this.isVideoOff = true;
+      this.isScreenSharing = false;
+      this.isRecording = false;
+      this.showSidePanel = false;
+      this.tabActive = "participants";
+      this.messages = [];
+      this.hasUnreadMessage = false;
 
-    //   console.log("[Store] Meeting state has been reset");
-    // },
+      console.log("[Store] Meeting state has been reset");
+    },
   },
 });
