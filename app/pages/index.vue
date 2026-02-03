@@ -106,13 +106,6 @@
                 class="text-[20px] group-hover:translate-x-0.5 transition-transform"
               />
             </button>
-            <!-- Permissions Hint -->
-            <p
-              class="text-xs text-center text-slate-400 dark:text-slate-500 pt-1"
-            >
-              Made with ❤️ by
-              <span class="font-semibold font-mono">Fajar Nur Hidayat</span>
-            </p>
           </form>
           <!-- Footer Features -->
           <div
