@@ -52,26 +52,51 @@ export const useWebRTC = (
   const config = useRuntimeConfig();
   const SOCKET_URL = config.public.socketUrl || "http://localhost:3001";
 
+  // Build ICE servers configuration from env
+  const buildIceServers = (): RTCIceServer[] => {
+    const servers: RTCIceServer[] = [];
+
+    // STUN servers (comma-separated)
+    const stunServers = String(config.public.stunServers || "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302");
+    if (stunServers) {
+      stunServers.split(',').forEach((url: string) => {
+        const trimmedUrl = url.trim();
+        if (trimmedUrl) {
+          servers.push({ urls: trimmedUrl });
+        }
+      });
+    }
+
+    // TURN servers (optional)
+    const turnUrl = String(config.public.turnUrl || "");
+    const turnUsername = String(config.public.turnUsername || "");
+    const turnCredential = String(config.public.turnCredential || "");
+
+    if (turnUrl && turnUsername && turnCredential) {
+      // TURN UDP
+      servers.push({
+        urls: `${turnUrl}?transport=udp`,
+        username: turnUsername,
+        credential: turnCredential,
+      });
+
+      // TURN TCP fallback
+      servers.push({
+        urls: `${turnUrl}?transport=tcp`,
+        username: turnUsername,
+        credential: turnCredential,
+      });
+
+      console.log('[WebRTC] TURN servers configured:', turnUrl);
+    } else {
+      console.log('[WebRTC] TURN servers not configured (using STUN only)');
+    }
+
+    return servers;
+  };
+
   const iceServers: RTCConfiguration = {
-    iceServers: [
-      // STUN (optional, buat dapat srflx)
-      { urls: "stun:stun.l.google.com:19302" },
-      { urls: "stun:stun1.l.google.com:19302" },
-
-      // TURN UDP (utama buat relay)
-      {
-        urls: "turn:turn.rekrutmen-traspac.web.id:3478?transport=udp",
-        username: "webrtcuser",
-        credential: "strongpassword123",
-      },
-
-      // TURN TCP fallback (kalau UDP diblok)
-      {
-        urls: "turn:turn.rekrutmen-traspac.web.id:3478?transport=tcp",
-        username: "webrtcuser",
-        credential: "strongpassword123",
-      },
-    ],
+    iceServers: buildIceServers(),
   };
 
   /**
