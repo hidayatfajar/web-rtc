@@ -110,6 +110,15 @@ NUXT_PUBLIC_SOCKET_URL=http://localhost:3001
 # Production example:
 # NUXT_PUBLIC_SOCKET_URL=https://api.yourdomain.com
 
+# WebRTC ICE Servers Configuration
+# STUN Servers (comma-separated)
+NUXT_PUBLIC_STUN_SERVERS=stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302
+
+# TURN Server (optional, recommended for production)
+NUXT_PUBLIC_TURN_URL=turn:turn.yourdomain.com:3478
+NUXT_PUBLIC_TURN_USERNAME=your_turn_username
+NUXT_PUBLIC_TURN_CREDENTIAL=your_turn_password
+
 # Node Environment
 NODE_ENV=development
 
@@ -123,9 +132,15 @@ HOST=0.0.0.0
 | Variable | Deskripsi | Default | Required |
 |----------|-----------|---------|----------|
 | `NUXT_PUBLIC_SOCKET_URL` | URL backend Socket.IO server | http://localhost:3001 | Yes |
+| `NUXT_PUBLIC_STUN_SERVERS` | STUN servers (comma-separated) | Google STUN servers | No |
+| `NUXT_PUBLIC_TURN_URL` | TURN server URL (without transport) | - | No |
+| `NUXT_PUBLIC_TURN_USERNAME` | TURN server username | - | No* |
+| `NUXT_PUBLIC_TURN_CREDENTIAL` | TURN server password/credential | - | No* |
 | `NODE_ENV` | Environment mode | development | No |
 | `PORT` | Port aplikasi akan berjalan | 3000 | No |
 | `HOST` | Host binding address | 0.0.0.0 | No |
+
+**Note:** TURN server variables (URL, username, credential) harus diisi semua atau tidak sama sekali. Jika tidak diisi, aplikasi akan menggunakan STUN servers saja.
 
 ### Nuxt Configuration
 
@@ -146,7 +161,11 @@ export default defineNuxtConfig({
   
   runtimeConfig: {
     public: {
-      socketUrl: process.env.NUXT_PUBLIC_SOCKET_URL || "http://localhost:3001"
+      socketUrl: process.env.NUXT_PUBLIC_SOCKET_URL || "http://localhost:3001",
+      stunServers: process.env.NUXT_PUBLIC_STUN_SERVERS || "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302",
+      turnUrl: process.env.NUXT_PUBLIC_TURN_URL || "",
+      turnUsername: process.env.NUXT_PUBLIC_TURN_USERNAME || "",
+      turnCredential: process.env.NUXT_PUBLIC_TURN_CREDENTIAL || ""
     }
   },
   
@@ -162,6 +181,59 @@ export default defineNuxtConfig({
     }]
   }
 });
+```
+
+### WebRTC ICE Servers Configuration
+
+Aplikasi mendukung konfigurasi custom ICE servers untuk WebRTC connections:
+
+#### STUN Servers
+STUN (Session Traversal Utilities for NAT) servers digunakan untuk mendapatkan public IP address. By default menggunakan Google STUN servers.
+
+**Format:** Comma-separated list
+```env
+NUXT_PUBLIC_STUN_SERVERS=stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302
+```
+
+#### TURN Servers
+TURN (Traversal Using Relays around NAT) servers digunakan sebagai relay ketika direct peer-to-peer connection gagal (misalnya karena firewall atau symmetric NAT).
+
+**Kapan perlu TURN:**
+- Production environment dengan users di belakang corporate firewall
+- Symmetric NAT scenarios
+- Meningkatkan success rate koneksi WebRTC
+
+**Setup:**
+```env
+NUXT_PUBLIC_TURN_URL=turn:turn.yourdomain.com:3478
+NUXT_PUBLIC_TURN_USERNAME=your_username
+NUXT_PUBLIC_TURN_CREDENTIAL=your_password
+```
+
+**Note:** Aplikasi akan otomatis membuat 2 TURN servers (UDP dan TCP) dari config di atas:
+- `turn:turn.yourdomain.com:3478?transport=udp` (primary)
+- `turn:turn.yourdomain.com:3478?transport=tcp` (fallback)
+
+#### TURN Server Options
+
+**Public TURN Servers:**
+- [Twilio TURN](https://www.twilio.com/stun-turn)
+- [Xirsys](https://xirsys.com/)
+- [Metered TURN](https://www.metered.ca/tools/openrelay/)
+
+**Self-hosted:**
+Install coturn server di VPS Anda:
+```bash
+sudo apt-get install coturn
+```
+
+Configure `/etc/turnserver.conf`:
+```conf
+listening-port=3478
+fingerprint
+lt-cred-mech
+user=webrtcuser:strongpassword123
+realm=yourdomain.com
 ```
 
 ## 🚀 Menjalankan Aplikasi
@@ -710,11 +782,6 @@ Test di browsers:
   "postinstall": "nuxt prepare"   // Generate types
 }
 ```
-
-## 👨‍💻 Developer
-
-**Fajar Nur Hidayat**
-- Author & Main Developer
 
 ## 📄 License
 
